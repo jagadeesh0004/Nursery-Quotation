@@ -41,6 +41,7 @@ export function AuthProvider({ children }) {
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
   const [isNewSession, setIsNewSession] = useState(false) // Track if just logged in
+  const [profileLoaded, setProfileLoaded] = useState(false) // Track if profile fetch completed
 
   const syncSession = useCallback(async () => {
     const { data: { session: currentSession }, error } = await supabase.auth.getSession()
@@ -160,31 +161,30 @@ export function AuthProvider({ children }) {
   const fetchProfile = useCallback(async () => {
     if (!session?.user || !session?.access_token) {
       setProfile(null)
-      setIsNewSession(false)  // ← Reset here too!
+      setIsNewSession(false)
+      setProfileLoaded(true)  // ← Mark as loaded
       return null
     }
      try {
        const res = await profileService.get()
        setProfile(res.data.data)
-       // Reset isNewSession after profile is fetched (either found or null)
        setIsNewSession(false)
+       setProfileLoaded(true)  // ← Mark as loaded
        return res.data.data
     } catch (err) {
       if (err.response?.status === 404) {
-        // New user has no profile yet
         setProfile(null)
-        // Reset isNewSession even if profile not found (so redirect only happens once)
         setIsNewSession(false)
+        setProfileLoaded(true)  // ← Mark as loaded
         return null
       } else if (err.response?.status === 401) {
-        // Backend rejected token; keep session for debugging
         console.log('Profile fetch returned 401; backend rejected token')
       } else {
         console.log('Profile fetch error:', err.message)
         setProfile(null)
       }
-      // Reset isNewSession on any fetch completion
       setIsNewSession(false)
+      setProfileLoaded(true)  // ← Mark as loaded
       return null
     }
   }, [session?.user, session?.access_token])
@@ -203,7 +203,8 @@ export function AuthProvider({ children }) {
     setSession(null)
     setUser(null)
     setProfile(null)
-    setIsNewSession(false)  // ← Reset this too on logout
+    setIsNewSession(false)
+    setProfileLoaded(false)  // ← Reset this too on logout
     // Clear localStorage to ensure clean state
     clearSupabaseStorage()
   }, [])
@@ -240,6 +241,7 @@ export function AuthProvider({ children }) {
          isAuthenticated: !!session?.access_token,
          loading,
          isNewSession,
+         profileLoaded,
          logout,
          login,
          refreshSession: syncSession,
