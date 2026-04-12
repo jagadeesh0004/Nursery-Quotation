@@ -165,11 +165,15 @@ export function AuthProvider({ children }) {
      try {
        const res = await profileService.get()
        setProfile(res.data.data)
+       // Reset isNewSession after profile is fetched (either found or null)
+       setIsNewSession(false)
        return res.data.data
     } catch (err) {
       if (err.response?.status === 404) {
         // New user has no profile yet
         setProfile(null)
+        // Reset isNewSession even if profile not found (so redirect only happens once)
+        setIsNewSession(false)
         return null
       } else if (err.response?.status === 401) {
         // Backend rejected token; keep session for debugging
@@ -178,6 +182,8 @@ export function AuthProvider({ children }) {
         console.log('Profile fetch error:', err.message)
         setProfile(null)
       }
+      // Reset isNewSession on any fetch completion
+      setIsNewSession(false)
       return null
     }
   }, [session?.user, session?.access_token])
