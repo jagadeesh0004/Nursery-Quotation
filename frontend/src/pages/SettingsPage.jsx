@@ -8,7 +8,7 @@ import { Button, Input, Textarea, PageHeader, SectionCard } from '../components/
 import { getError } from '../utils'
 
 export default function SettingsPage() {
-  const { profile, user, fetchProfile, logout } = useAuth()
+  const { profile, user, fetchProfile, logout, loading } = useAuth()
   const navigate = useNavigate()
 
   const [ownerName, setOwnerName]     = useState('')
@@ -21,6 +21,18 @@ export default function SettingsPage() {
   const [logoUploading, setLogoUploading] = useState(false)
 
   const fileRef = useRef()
+
+  // Show loading state while profile is being fetched
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-gray-200 border-t-[#5CB338] rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-gray-600">Loading your settings...</p>
+        </div>
+      </div>
+    )
+  }
 
   // Single source of truth: profile from AuthContext.
   // logoPreview is derived here — never set manually after an upload.
