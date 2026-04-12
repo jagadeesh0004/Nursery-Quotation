@@ -160,6 +160,7 @@ export function AuthProvider({ children }) {
   const fetchProfile = useCallback(async () => {
     if (!session?.user || !session?.access_token) {
       setProfile(null)
+      setIsNewSession(false)  // ← Reset here too!
       return null
     }
      try {
@@ -202,6 +203,7 @@ export function AuthProvider({ children }) {
     setSession(null)
     setUser(null)
     setProfile(null)
+    setIsNewSession(false)  // ← Reset this too on logout
     // Clear localStorage to ensure clean state
     clearSupabaseStorage()
   }, [])
