@@ -30,8 +30,7 @@ export default function ProtectedRoute() {
     return <Navigate to="/login" replace />
   }
 
-  if (!profile && location.pathname !== '/settings') {
-    console.log('📌 No profile yet, redirecting to settings')
+  if (!loading && isAuthenticated && profile === null && location.pathname !== '/settings') {
     return <Navigate to="/settings" replace />
   }
 
