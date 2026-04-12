@@ -1,0 +1,97 @@
+# ================================================================================
+# 🔐 SECURITY - ENVIRONMENT & CREDENTIALS (NEVER COMMIT)
+# ================================================================================
+# Environment files with secrets
+.env
+.env.local
+.env.*.local
+.env.prod
+.env.staging
+
+# Keys and certificates
+*.key
+*.pem
+*.p12
+*.pfx
+*.jks
+
+# Configuration files with credentials
+.env.json
+secrets.json
+credentials.json
+
+# Root-level JavaScript test scripts (MUST stay in /backend/scripts or /tests)
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDEs
+.vscode/
+.eclipse/
+*.swp
+*.swo
+
+# Logs
+logs/
+*.log
+
+# Archive directory (for historical reference only, not needed in active repo)
+# Keep locally but don't push to origin
+.archive/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Temporary files
+tmp/
+temp/
+.tmp/
+
+# ================================================================================
+# BACKEND - Maven & Java
+# ================================================================================
+backend/target/
+backend/.classpath
+backend/.project
+backend/.settings/
+backend/*.class
+backend/*.jar
+backend/out/
+
+# ================================================================================
+# FRONTEND - Node & npm
+# ================================================================================
+frontend/node_modules/
+frontend/.next/
+frontend/dist/
+frontend/build/
+frontend/.env.local
+frontend/.env.*.local
+
+# ================================================================================
+# IDE - IntelliJ, VS Code, Eclipse
+# ================================================================================
+.idea/
+*.iml
+*.iws
+*.ipr
+*.code-workspace
+
+# ================================================================================
+# BUILD ARTIFACTS
+# ================================================================================
+*.war
+*.ear
+target/
+dist/
+build/
+
+# ================================================================================
+# UPLOAD DIRECTORIES (generated at runtime)
+# ================================================================================
+uploads/
+logs/
+

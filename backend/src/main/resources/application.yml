@@ -1,0 +1,97 @@
+server:
+  port: ${SERVER_PORT:8091}
+  servlet:
+    context-path: /api
+
+spring:
+  application:
+    name: nursery-quotation-system
+
+  datasource:
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 60000
+      initialization-fail-timeout: 60000
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+        default_schema: public
+        jdbc:
+          batch_size: 20
+        order_inserts: true
+        order_updates: true
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    validate-on-migrate: false
+    locations: classpath:db/migration
+    encoding: UTF-8
+
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 5MB
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI}
+
+  cache:
+    type: caffeine
+    caffeine:
+      spec: maximumSize=1000,expireAfterWrite=24h
+
+supabase:
+  jwks-uri: ${SUPABASE_JWKS_URI}
+  issuer: ${SUPABASE_ISSUER}
+  project-id: ${SUPABASE_PROJECT_ID}
+
+app:
+  file:
+    upload-dir: ${UPLOAD_DIR:./uploads}
+    logos-dir: ${LOGOS_DIR:./uploads/logos}
+    pdfs-dir: ${PDFS_DIR:./uploads/pdfs}
+  pdf:
+    cache-enabled: ${PDF_CACHE_ENABLED:false}
+  frontend:
+    url: ${FRONTEND_URL}
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS}
+
+# ✅ FIX #6: Rate Limiting Configuration
+resilience4j:
+  ratelimiter:
+    instances:
+      pdf-generation:
+        registerHealthIndicator: true
+        limitRefreshPeriod: 1m
+        limitForPeriod: 10
+        timeoutDuration: 5s
+        eventConsumerBufferSize: 100
+
+logging:
+level:
+com.nursery: DEBUG
+org.flywaydb: INFO
+org.springframework.security: DEBUG
+org.springframework.security.oauth2: TRACE
+file:name: logs/app.log
+
+
+
+
+

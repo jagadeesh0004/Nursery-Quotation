@@ -1,0 +1,76 @@
+package com.nursery.quotation;
+
+import com.nursery.common.entity.BaseAuditEntity;
+import jakarta.persistence.*;
+import lombok.*;
+import org.hibernate.annotations.SQLRestriction;
+
+import java.math.BigDecimal;
+import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+
+@Entity
+@Table(name = "quotations")
+@SQLRestriction("deleted_at IS NULL")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class Quotation extends BaseAuditEntity {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(name = "user_id", nullable = false)
+    private UUID userId;
+
+    @Column(name = "quotation_number", unique = true, length = 50)
+    private String quotationNumber;
+
+    @Column(name = "year", nullable = false)
+    private Integer year;
+
+    @Column(name = "sequence")
+    private Integer sequence;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false, length = 10)
+    private QuotationStatus status;
+
+    @Column(name = "customer_name", length = 150)
+    private String customerName;
+
+    @Column(name = "customer_phone", length = 15)
+    private String customerPhone;
+
+    @Column(name = "customer_address")
+    private String customerAddress;
+
+    @Column(name = "total_amount", nullable = false)
+    @Builder.Default
+    private BigDecimal totalAmount = BigDecimal.ZERO;
+
+    @Version
+    @Column(name = "version", nullable = false)
+    private Integer version;
+
+    @Column(name = "public_token", unique = true, length = 64)
+    private String publicToken;
+
+    @Column(name = "public_token_expires_at")
+    private OffsetDateTime publicTokenExpiresAt;
+
+    @Column(name = "finalized_at")
+    private OffsetDateTime finalizedAt;
+
+    @Column(name = "deleted_at")
+    private OffsetDateTime deletedAt;
+
+    @OneToMany(mappedBy = "quotation", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @Builder.Default
+    private List<QuotationItem> items = new ArrayList<>();
+}

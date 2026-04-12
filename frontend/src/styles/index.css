@@ -1,0 +1,73 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Base reset ─────────────────────────────────────────── */
+@layer base {
+  *, *::before, *::after { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+
+  body {
+    @apply bg-green-50/40 text-ink font-sans antialiased;
+  }
+
+  /* Remove number input spinners */
+  input[type=number]::-webkit-inner-spin-button,
+  input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+  input[type=number] { -moz-appearance: textfield; }
+}
+
+/* ── Reusable component classes ─────────────────────────── */
+@layer components {
+
+  /* Input / select / textarea base */
+  .field {
+    @apply w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-white
+           text-sm text-ink placeholder:text-gray-400 font-sans
+           transition-all duration-150 outline-none
+           focus:border-green-600 focus:ring-2 focus:ring-green-600/15;
+  }
+  .field-error {
+    @apply border-red-400 focus:border-red-500 focus:ring-red-400/15;
+  }
+
+   /* Section label above input */
+   .label {
+     @apply block text-xs font-semibold text-muted mb-1.5 tracking-wide;
+   }
+
+  /* Card surface */
+  .card {
+    @apply bg-white rounded-2xl border border-gray-100 shadow-sm;
+  }
+
+   /* Primary button */
+   .btn-primary {
+     @apply bg-[#5CB338] hover:bg-[#4d962e] text-white font-semibold rounded-xl
+            px-5 py-2.5 text-sm transition-all duration-150 active:scale-95
+            shadow-sm hover:shadow-md disabled:opacity-50 disabled:pointer-events-none;
+   }
+
+  /* Scrollbar */
+  .scroll-thin::-webkit-scrollbar { width: 4px; }
+  .scroll-thin::-webkit-scrollbar-track { background: transparent; }
+  .scroll-thin::-webkit-scrollbar-thumb { @apply bg-gray-300 rounded-full; }
+}
+
+/* ── Shimmer skeleton ───────────────────────────────────── */
+.skeleton {
+  background: linear-gradient(90deg, #eef3ee 25%, #e4ebe4 50%, #eef3ee 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s linear infinite;
+  border-radius: 8px;
+}
+
+/* ── Stagger delays ─────────────────────────────────────── */
+.stagger > *:nth-child(1) { animation-delay: .04s; }
+.stagger > *:nth-child(2) { animation-delay: .08s; }
+.stagger > *:nth-child(3) { animation-delay: .12s; }
+.stagger > *:nth-child(4) { animation-delay: .16s; }
+.stagger > *:nth-child(5) { animation-delay: .20s; }
+.stagger > *:nth-child(6) { animation-delay: .24s; }
+.stagger > *:nth-child(7) { animation-delay: .28s; }
+.stagger > *:nth-child(8) { animation-delay: .32s; }
