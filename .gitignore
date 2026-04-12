@@ -22,7 +22,13 @@ credentials.json
 
 # Root-level JavaScript test scripts (MUST stay in /backend/scripts or /tests)
 
-# OS files
+# ================================================================================
+# DOCUMENTATION & DEBUGGING (Development only, not committed)
+# ================================================================================
+*.md
+!README.md
+*.sql
+!src/main/resources/db/migration/*.sql
 .DS_Store
 Thumbs.db
 
