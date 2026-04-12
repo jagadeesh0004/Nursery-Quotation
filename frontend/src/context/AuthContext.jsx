@@ -40,6 +40,7 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [isNewSession, setIsNewSession] = useState(false) // Track if just logged in
 
   const syncSession = useCallback(async () => {
     const { data: { session: currentSession }, error } = await supabase.auth.getSession()
@@ -117,32 +118,37 @@ export function AuthProvider({ children }) {
      // Initialize on mount
      initializeAuth()
 
-     // Listen for auth state changes (login, logout, token refresh)
-     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-       async (_event, currentSession) => {
-         console.log('🔄 Auth state changed:', {
-           event: _event,
-           hasSession: !!currentSession,
-           email: currentSession?.user?.email,
-         })
+      // Listen for auth state changes (login, logout, token refresh)
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(
+        async (_event, currentSession) => {
+          console.log('🔄 Auth state changed:', {
+            event: _event,
+            hasSession: !!currentSession,
+            email: currentSession?.user?.email,
+          })
 
-         if (mounted) {
-           // Validate session has a valid token
-           if (currentSession?.access_token) {
-             setSession(currentSession)
-             if (currentSession?.user) {
-               setUser(currentSession.user)
-             }
-           } else {
-             // No valid token, clear session
-             setSession(null)
-             setUser(null)
-             setProfile(null)
-           }
-           setLoading(false)
-         }
-       }
-     )
+          if (mounted) {
+            // Validate session has a valid token
+            if (currentSession?.access_token) {
+              setSession(currentSession)
+              if (currentSession?.user) {
+                setUser(currentSession.user)
+              }
+              // Mark as new session only on SIGNED_IN event (login), not on page reload
+              if (_event === 'SIGNED_IN') {
+                setIsNewSession(true)
+              }
+            } else {
+              // No valid token, clear session
+              setSession(null)
+              setUser(null)
+              setProfile(null)
+              setIsNewSession(false)
+            }
+            setLoading(false)
+          }
+        }
+      )
 
      return () => {
        mounted = false
@@ -216,24 +222,25 @@ export function AuthProvider({ children }) {
   // ── Token from session (for API calls) ────────────────────
   const token = session?.access_token || null
 
-  return (
-    <AuthContext.Provider
-      value={{
-        session,
-        user,
-        profile,
-        token,
-        isAuthenticated: !!session?.access_token,
-        loading,
-        logout,
-        login,
-        refreshSession: syncSession,
-        fetchProfile,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
-  )
+   return (
+     <AuthContext.Provider
+       value={{
+         session,
+         user,
+         profile,
+         token,
+         isAuthenticated: !!session?.access_token,
+         loading,
+         isNewSession,
+         logout,
+         login,
+         refreshSession: syncSession,
+         fetchProfile,
+       }}
+     >
+       {children}
+     </AuthContext.Provider>
+   )
 }
 
 // eslint-disable-next-line react-refresh/only-export-components

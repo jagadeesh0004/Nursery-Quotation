@@ -9,7 +9,7 @@ import { Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
 export default function ProtectedRoute() {
-  const { isAuthenticated, loading, profile } = useAuth()
+  const { isAuthenticated, loading, profile, isNewSession } = useAuth()
   const location = useLocation()
 
   // Wait for session to load - don't redirect while loading
@@ -30,8 +30,9 @@ export default function ProtectedRoute() {
     return <Navigate to="/login" replace />
   }
 
-  // After loading is done, if profile is null and user is not on settings, redirect to settings
-  if (!loading && profile === null && location.pathname !== '/settings') {
+  // Only redirect to settings if: profile is null AND just logged in (new session)
+  // Don't redirect on page reload if user already set up profile before
+  if (profile === null && isNewSession && location.pathname !== '/settings') {
     console.log('📌 New user with no profile, redirecting to settings')
     return <Navigate to="/settings" replace />
   }
