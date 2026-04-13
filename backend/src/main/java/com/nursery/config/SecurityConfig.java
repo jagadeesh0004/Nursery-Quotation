@@ -45,7 +45,7 @@ public class SecurityConfig {
 
                 .authorizeHttpRequests(auth -> auth
                         // Public endpoints (no auth required)
-                        .requestMatchers("/ping").permitAll()
+                        .requestMatchers("/api/ping").permitAll()
                         .requestMatchers("/api/public/**", "/api/sharing/**").permitAll()
                         // All other endpoints require Supabase authentication
                         .anyRequest().authenticated()
