@@ -8,7 +8,7 @@ import { Button, Input, Textarea, PageHeader, SectionCard } from '../components/
 import { getError } from '../utils'
 
 export default function SettingsPage() {
-  const { profile, user, fetchProfile, logout, loading } = useAuth()
+  const { profile, user, fetchProfile, logout, profileLoaded } = useAuth()
   const navigate = useNavigate()
 
   const [ownerName, setOwnerName]     = useState('')
@@ -22,17 +22,9 @@ export default function SettingsPage() {
 
   const fileRef = useRef()
 
-  // Show loading state while profile is being fetched
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-12 h-12 border-4 border-gray-200 border-t-[#5CB338] rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-gray-600">Loading your settings...</p>
-        </div>
-      </div>
-    )
-  }
+  // ✅ Profile is already loaded by ProtectedRoute
+  // If you see this page, profileLoaded = true
+  // So we don't need a loading spinner here
 
   // Single source of truth: profile from AuthContext.
   // logoPreview is derived here — never set manually after an upload.
@@ -43,12 +35,14 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (!profile) return
+    console.log('📝 SettingsPage: Populating form with profile data:', profile.nurseryName)
     setOwnerName(profile.ownerName   || '')
     setNurseryName(profile.nurseryName || '')
     setAddress(profile.address       || '')
     setPhone(profile.phone           || '')
 
     if (!profile.nurseryName) {
+      console.log('📝 SettingsPage: Profile incomplete, enabling edit mode')
       setIsEditing(true)
     }
   }, [profile])
@@ -63,28 +57,37 @@ export default function SettingsPage() {
     return Object.keys(errs).length === 0
   }
 
-   async function handleSave(e) {
-     e.preventDefault()
-     if (!validate()) return
-     setSaving(true)
-     try {
-       await profileService.update({
-         ownerName:   ownerName.trim(),
-         nurseryName: nurseryName.trim(),
-         address:     address.trim(),
-         phone:       phone.trim(),
-         email:       user?.email || '',
-       })
-       await fetchProfile()
-       toast.success('Profile saved!')
-       setIsEditing(false)
-     } catch (err) {
-       const message = getError(err)
-       if (message) toast.error(message)
-     } finally {
-       setSaving(false)
+     async function handleSave(e) {
+       e.preventDefault()
+       if (!validate()) return
+       setSaving(true)
+       try {
+         await profileService.update({
+           ownerName:   ownerName.trim(),
+           nurseryName: nurseryName.trim(),
+           address:     address.trim(),
+           phone:       phone.trim(),
+           email:       user?.email || '',
+         })
+         // ✅ BUG FIX #4: Check if fetchProfile succeeded before navigating
+         const updated = await fetchProfile()
+         if (updated) {
+           toast.success('Profile saved!')
+           setIsEditing(false)
+           // ✅ After saving profile, redirect to dashboard
+           console.log('📌 Profile saved successfully → redirecting to /dashboard')
+           navigate('/dashboard', { replace: true })
+         } else {
+           // Profile fetch failed, show error
+           toast.error('Profile saved but failed to reload. Please refresh the page.')
+         }
+       } catch (err) {
+         const message = getError(err)
+         if (message) toast.error(message)
+       } finally {
+         setSaving(false)
+       }
      }
-   }
 
    async function handleLogoChange(e) {
      const file = e.target.files?.[0]

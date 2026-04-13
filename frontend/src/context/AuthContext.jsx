@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { profileService } from '../services'
 
@@ -42,6 +42,10 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true)
   const [isNewSession, setIsNewSession] = useState(false) // Track if just logged in
   const [profileLoaded, setProfileLoaded] = useState(false) // Track if profile fetch completed
+
+  // ✅ BUG FIX #5: Track last fetched token to avoid duplicate API calls
+  // When session object reference changes but token is the same, skip the fetch
+  const lastFetchedToken = useRef(null)
 
   const syncSession = useCallback(async () => {
     const { data: { session: currentSession }, error } = await supabase.auth.getSession()
@@ -145,6 +149,8 @@ export function AuthProvider({ children }) {
               setUser(null)
               setProfile(null)
               setIsNewSession(false)
+              // ✅ BUG FIX #3: Reset profileLoaded when token is cleared
+              setProfileLoaded(false)
             }
             setLoading(false)
           }
@@ -157,41 +163,68 @@ export function AuthProvider({ children }) {
      }
    }, [])
 
-  // ── Fetch nursery profile when session changes ───────────
-  const fetchProfile = useCallback(async () => {
-    if (!session?.user || !session?.access_token) {
-      setProfile(null)
-      setIsNewSession(false)
-      setProfileLoaded(true)  // ← Mark as loaded
-      return null
-    }
-     try {
-       const res = await profileService.get()
-       setProfile(res.data.data)
+    // ── Fetch nursery profile when session changes ───────────
+   const fetchProfile = useCallback(async () => {
+     console.log('📥 fetchProfile() starting...')
+
+     // ✅ BUG FIX #5: Skip if already fetched for this token (deduplication)
+     if (!session?.access_token) {
+       // No token → skip and set profile to null
+       console.log('⏭️ fetchProfile skipped - no token')
+       setProfile(null)
        setIsNewSession(false)
-       setProfileLoaded(true)  // ← Mark as loaded
-       return res.data.data
-    } catch (err) {
-      if (err.response?.status === 404) {
-        setProfile(null)
+       setProfileLoaded(true)
+       return null
+     }
+
+     if (lastFetchedToken.current === session.access_token) {
+       console.log('⏭️ fetchProfile skipped - same token (deduplication)')
+       return null  // Don't refetch for same token
+     }
+
+     // Mark this token as fetched
+     lastFetchedToken.current = session.access_token
+
+     // ✅ BUG FIX #1: Reset profileLoaded at start to show spinner during re-fetch
+     setProfileLoaded(false)
+
+      try {
+        console.log('🔄 Fetching profile from API...')
+        const res = await profileService.get()
+        console.log('✅ Profile fetched:', res.data.data?.nurseryName || 'null')
+        setProfile(res.data.data)
         setIsNewSession(false)
         setProfileLoaded(true)  // ← Mark as loaded
-        return null
-      } else if (err.response?.status === 401) {
-        console.log('Profile fetch returned 401; backend rejected token')
-      } else {
-        console.log('Profile fetch error:', err.message)
-        setProfile(null)
-      }
-      setIsNewSession(false)
-      setProfileLoaded(true)  // ← Mark as loaded
-      return null
-    }
-  }, [session?.user, session?.access_token])
+        return res.data.data
+     } catch (err) {
+       if (err.response?.status === 404) {
+         console.log('⚠️ Profile not found (404) - new user, setting to null')
+         setProfile(null)
+         setIsNewSession(false)
+         setProfileLoaded(true)  // ← Mark as loaded
+         return null
+       } else if (err.response?.status === 401) {
+         console.log('⚠️ Profile fetch returned 401; backend rejected token')
+         setProfile(null)
+         setProfileLoaded(true)
+       } else {
+         console.log('❌ Profile fetch error:', err.message)
+         setProfile(null)
+         setProfileLoaded(true)
+       }
+       setIsNewSession(false)
+       return null
+     }
+   }, [session?.access_token])
 
-  useEffect(() => {
-    fetchProfile()
-  }, [fetchProfile])
+   useEffect(() => {
+     // ✅ BUG FIX #6: Wait for initial session loading to finish before fetching profile
+     // This prevents fetchProfile from running while loading=true and token=null,
+     // which would set profileLoaded=true with profile=null, triggering redirect to /settings
+     if (loading) return
+
+     fetchProfile()
+   }, [fetchProfile, loading])
 
   // ── Logout action ─────────────────────────────────────────
   const logout = useCallback(async () => {

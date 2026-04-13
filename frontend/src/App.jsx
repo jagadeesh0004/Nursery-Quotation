@@ -4,7 +4,7 @@ import { AuthProvider }        from './context/AuthContext'
 import ProtectedRoute          from './routes/ProtectedRoute'
 import AppLayout               from './components/layout/AppLayout'
 import LoginPage               from './pages/LoginPage'
-import AuthCallbackPage        from './pages/AuthCallbackPage'  // ADD THIS
+import AuthCallbackPage        from './pages/AuthCallbackPage'
 import DashboardPage           from './pages/DashboardPage'
 import PlantsPage              from './pages/PlantsPage'
 import QuotationFormPage       from './pages/QuotationFormPage'
@@ -12,17 +12,27 @@ import QuotationDetailPage     from './pages/QuotationDetailPage'
 import SettingsPage            from './pages/SettingsPage'
 import PublicQuotationPage     from './pages/PublicQuotationPage'
 
+/**
+ * App.jsx
+ * ─────────────────────────────────────────────────────────────
+ * Main app component with comprehensive authentication flow
+ * ─────────────────────────────────────────────────────────────
+ */
 export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
         <Routes>
-          {/* Public */}
+          {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+          {/* PUBLIC ROUTES (No auth required) */}
+          {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
           <Route path="/login"                    element={<LoginPage />} />
-          <Route path="/auth/callback"            element={<AuthCallbackPage />} />  {/* ADD THIS */}
+          <Route path="/auth/callback"            element={<AuthCallbackPage />} />
           <Route path="/public/quotations/:token" element={<PublicQuotationPage />} />
 
-          {/* Protected */}
+          {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+          {/* PROTECTED ROUTES (Auth + Profile required) */}
+          {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
           <Route element={<ProtectedRoute />}>
             <Route element={<AppLayout />}>
               <Route path="/dashboard"            element={<DashboardPage />} />
@@ -34,12 +44,17 @@ export default function App() {
             </Route>
           </Route>
 
-          {/* Fallback */}
+          {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+          {/* FALLBACK ROUTES */}
+          {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
           <Route path="/"  element={<Navigate to="/login" replace />} />
           <Route path="*"  element={<Navigate to="/login" replace />} />
         </Routes>
       </BrowserRouter>
 
+      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      {/* TOAST NOTIFICATIONS */}
+      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <Toaster
         position="bottom-right"
         gutter={8}
