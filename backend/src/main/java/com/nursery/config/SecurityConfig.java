@@ -44,7 +44,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // ✅ Health + public endpoints (NO AUTH)
                         // Note: context-path is /api, so these become /api/ping, /api/health, etc.
-                        .requestMatchers("/ping", "/health").permitAll()
+                        .requestMatchers("/ping", "/health" ,"/error").permitAll()
                         .requestMatchers("/public/**", "/sharing/**").permitAll()
 
                         // ✅ Everything else requires auth
