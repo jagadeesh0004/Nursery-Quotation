@@ -31,9 +31,9 @@ import java.util.UUID;
  * - Null Safety
  * - Multi-page PDF Support (FIX #8)
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
-@Slf4j
 public class PdfGenerationService {
 
     private final QuotationRepository quotationRepository;

@@ -34,7 +34,6 @@ public class SecurityConfig {
     private String allowedOrigins;
 
     @Bean
-    @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         CorsConfigurationSource corsConfigSource = corsConfigurationSource();
 
