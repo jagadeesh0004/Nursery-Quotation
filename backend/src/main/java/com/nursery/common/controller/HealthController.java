@@ -1,19 +1,18 @@
-package com.nursery.common.controller;
+package com.nursery.controller;
 
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * Lightweight health check controller to keep the service warm and monitor status.
- */
 @RestController
-@RequestMapping("/ping")
 public class HealthController {
 
-    @GetMapping
+    @GetMapping("/api/ping")
     public String ping() {
         return "ok";
     }
-}
 
+    @GetMapping("/api/health")
+    public String health() {
+        return "healthy";
+    }
+}

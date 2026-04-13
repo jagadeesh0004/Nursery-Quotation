@@ -34,37 +34,31 @@ public class SecurityConfig {
     private String allowedOrigins;
 
     @Bean
+    @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         CorsConfigurationSource corsConfigSource = corsConfigurationSource();
-        
+
         http
-                // ✅ FIX #3: CSRF protection enabled (stateless JWT auth)
                 .csrf(csrf -> csrf.disable())
-                // ✅ FIX #2: CORS properly configured with allowed origins
                 .cors(cors -> cors.configurationSource(request -> corsConfigSource.getCorsConfiguration(request)))
 
                 .authorizeHttpRequests(auth -> auth
-                        // Public endpoints (no auth required)
-                        .requestMatchers("/api/ping").permitAll()
+                        // ✅ Health + public endpoints (NO AUTH)
+                        .requestMatchers("/api/ping", "/api/health").permitAll()
                         .requestMatchers("/api/public/**", "/api/sharing/**").permitAll()
-                        // All other endpoints require Supabase authentication
+
+                        // ✅ Everything else requires auth
                         .anyRequest().authenticated()
                 )
 
-                // 🔥 Validate Supabase JWT tokens via OAuth2 Resource Server
                 .oauth2ResourceServer(oauth2 -> oauth2
-                        .jwt(jwt -> {
-                            jwt.decoder(jwtDecoder());
-                        })
-                        // ✅ FIX #5: Add authentication logging for security monitoring
+                        .jwt(jwt -> jwt.decoder(jwtDecoder()))
                         .authenticationEntryPoint((request, response, authException) -> {
                             String remoteAddr = request.getRemoteAddr();
                             String uri = request.getRequestURI();
 
-                            log.warn("🔴 AUTHENTICATION FAILED | IP: {} | URI: {} | Reason: {}",
-                                remoteAddr,
-                                uri,
-                                authException.getMessage());
+                            log.warn("🔴 AUTH FAILED | IP: {} | URI: {} | Reason: {}",
+                                    remoteAddr, uri, authException.getMessage());
 
                             response.sendError(401, "Unauthorized");
                         })
@@ -72,7 +66,6 @@ public class SecurityConfig {
 
         return http.build();
     }
-
     // ✅ FIX #2: CORS configuration - restrict to known origins only
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
