@@ -34,39 +34,47 @@ export default function LoginPage() {
        return
      }
 
-     setLoading(true)
-     try {
-       console.log('🔐 Attempting login with:', email)
-       const result = await login(email, password)
+      setLoading(true)
+      try {
+        console.log('🔐 Attempting login with:', email)
+        const result = await login(email, password)
 
-       console.log('📊 Login response:', {
-         success: result.success,
-         hasSession: !!result.session,
-         errorMsg: result.error?.message,
-         user: result.session?.user?.email,
-       })
+        console.log('📊 Login response:', {
+          success: result.success,
+          hasSession: !!result.session,
+          errorMsg: result.error?.message,
+          user: result.session?.user?.email,
+        })
 
-       if (!result.success) {
-         console.error('❌ Login error:', result.error)
-         toast.error(result.error?.message || 'Failed to sign in')
-       } else if (result.session) {
-         console.log('✅ Login successful:', email)
-         console.log('✅ Session token:', result.session.access_token?.substring(0, 20) + '...')
-         const profileData = await fetchProfile()
-         const target = profileData ? '/dashboard' : '/settings'
-         toast.success('Signed in successfully')
-         navigate(target, { replace: true })
-       } else {
-         await refreshSession()
-         console.warn('⚠️ Login response has no session or error:', result)
-         toast.error('Login failed: No session returned')
-       }
-     } catch (err) {
-       console.error('❌ Sign-in error:', err)
-       toast.error(err.message || 'An error occurred during sign-in')
-     } finally {
-       setLoading(false)
-     }
+        if (!result.success) {
+          console.error('❌ Login error:', result.error)
+          toast.error(result.error?.message || 'Failed to sign in')
+        } else if (result.session) {
+          console.log('✅ Login successful:', email)
+          console.log('✅ Session token:', result.session.access_token?.substring(0, 20) + '...')
+
+          // ✅ BUG FIX: Don't wait for profile fetch - redirect immediately
+          // Profile will be fetched in background via fetchProfile in AuthContext
+          // This prevents timeout from blocking login for new accounts
+          toast.success('Signed in successfully')
+
+          // Redirect based on whether we have profile or not
+          // For new users, they'll see /settings and profile will load in background
+          // For returning users, they'll see /dashboard
+          const defaultTarget = profile ? '/dashboard' : '/settings'
+          console.log('📌 Login redirecting to:', defaultTarget)
+          navigate(defaultTarget, { replace: true })
+        } else {
+          await refreshSession()
+          console.warn('⚠️ Login response has no session or error:', result)
+          toast.error('Login failed: No session returned')
+        }
+      } catch (err) {
+        console.error('❌ Sign-in error:', err)
+        toast.error(err.message || 'An error occurred during sign-in')
+      } finally {
+        setLoading(false)
+      }
    }
 
   // Handle signup

@@ -190,9 +190,14 @@ public class PlantService {
      * Called from NurseryProfileService when a new profile is created.
      */
     @Async
-    @Transactional
     public void initializeDefaultPlantsForUserAsync(UUID userId) {
-        initializeDefaultPlantsForUser(userId);
+        try {
+            log.info("🌱 [ASYNC] Starting plant initialization for userId: {}", userId);
+            initializeDefaultPlantsForUser(userId);
+            log.info("🌱 [ASYNC] Plant initialization completed for userId: {}", userId);
+        } catch (Exception e) {
+            log.error("❌ [ASYNC] Plant initialization failed for userId: {}", userId, e);
+        }
     }
 
     /**

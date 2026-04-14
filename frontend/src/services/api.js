@@ -13,7 +13,7 @@ import { supabase } from '../lib/supabase'
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: { 'Content-Type': 'application/json' },
-  timeout: 15000,
+  timeout: 30000,  // ✅ Increased from 15s to 30s for slower backends
 })
 
 // ─── REQUEST INTERCEPTOR ──────────────────────────────────────────────────────
@@ -64,12 +64,16 @@ api.interceptors.response.use(
   // Error response
   async (error) => {
     const { status } = error.response || {}
+    const isTimeout = error.message.includes('timeout')
+    const backendMessage = error.response?.data?.message || error.response?.data?.error
 
     console.error('❌ API Error:', {
       url: error.config?.url,
       status,
       method: error.config?.method,
       message: error.message,
+      backendMessage,  // ✅ Log backend error message
+      isTimeout,
     })
 
     // Handle 401 - Redirect to login
@@ -81,6 +85,22 @@ api.interceptors.response.use(
       } catch (err) {
         console.error('Error during logout:', err)
       }
+    }
+
+    // ✅ Handle timeout errors gracefully
+    if (isTimeout) {
+      console.warn('⏱️ Request timeout - operation may still succeed on backend')
+      // Don't show aggressive error here - let consumer handle it
+      // This prevents cascading retry loops
+    }
+
+    // ✅ Log 500 errors with backend message
+    if (status === 500) {
+      console.error('🔴 Backend error (500):', {
+        url: error.config?.url,
+        backendMessage: backendMessage || 'No error details from backend',
+        fullResponse: error.response?.data,
+      })
     }
 
     // Note: Error toasts are handled by the API consumer, not here globally

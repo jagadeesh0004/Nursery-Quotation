@@ -26,13 +26,17 @@ export default function ProtectedRoute() {
     pathname: location.pathname,
   })
 
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // STATE 1: LOADING - Wait for profile to load completely
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  if (loading || !profileLoaded) {
-    console.log('⏳ Waiting for profile to load...')
-    return <FullScreenSpinner message="Loading your data..." />
-  }
+   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   // STATE 1: LOADING - Wait for profile to load completely
+   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   // ✅ BUG FIX: Only wait for profileLoaded if user IS authenticated
+   // - If loading: show spinner (session initializing)
+   // - If authenticated but profile not loaded: show spinner (profile fetching)
+   // - If NOT authenticated: skip spinner, go to login redirect
+   if (loading || (!profileLoaded && isAuthenticated)) {
+     console.log('⏳ Waiting for profile to load...')
+     return <FullScreenSpinner message="Loading your data..." />
+   }
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   // STATE 2: DATA LOADED - Now check authentication

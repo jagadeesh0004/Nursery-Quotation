@@ -8,7 +8,7 @@ import { Button, Input, Textarea, PageHeader, SectionCard } from '../components/
 import { getError } from '../utils'
 
 export default function SettingsPage() {
-  const { profile, user, fetchProfile, logout, profileLoaded } = useAuth()
+  const { profile, user, fetchProfile, forceRefreshProfile, logout, profileLoaded } = useAuth()
   const navigate = useNavigate()
 
   const [ownerName, setOwnerName]     = useState('')
@@ -57,73 +57,118 @@ export default function SettingsPage() {
     return Object.keys(errs).length === 0
   }
 
-     async function handleSave(e) {
-       e.preventDefault()
-       if (!validate()) return
-       setSaving(true)
+      async function handleSave(e) {
+        e.preventDefault()
+        if (!validate()) return
+        setSaving(true)
+        try {
+          console.log('💾 Saving profile with data:', {
+            ownerName: ownerName.trim(),
+            nurseryName: nurseryName.trim(),
+            address: address.trim(),
+            phone: phone.trim(),
+            email: user?.email || '',
+          })
+
+          // ✅ Backend extracts userId from auth token, so we don't send it
+          await profileService.update({
+            ownerName:   ownerName.trim(),
+            nurseryName: nurseryName.trim(),
+            address:     address.trim(),
+            phone:       phone.trim(),
+            email:       user?.email || '',
+          })
+
+          console.log('✅ Profile saved to backend')
+
+          // ✅ BUG FIX: Use forceRefreshProfile to bust cache and re-fetch after save
+          const updated = await forceRefreshProfile()
+          if (updated) {
+            toast.success('Profile saved!')
+            setIsEditing(false)
+            // ✅ After saving profile, redirect to dashboard
+            console.log('📌 Profile saved successfully → redirecting to /dashboard')
+            navigate('/dashboard', { replace: true })
+          } else {
+            // Profile fetch failed, show error
+            toast.error('Profile saved but failed to reload. Please refresh the page.')
+          }
+        } catch (err) {
+          console.error('❌ Profile save error:', err)
+
+          // ✅ BUG FIX: Handle timeout gracefully
+          // Backend may have succeeded but frontend timed out waiting
+          if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
+            console.warn('⏱️ Request timeout - backend may have succeeded, verifying...')
+            toast.loading('Verifying save...')
+            try {
+              const updated = await forceRefreshProfile()
+              if (updated) {
+                toast.dismiss()
+                toast.success('Profile saved!')
+                setIsEditing(false)
+                console.log('📌 Profile verified and saved successfully → redirecting to /dashboard')
+                navigate('/dashboard', { replace: true })
+                return
+              }
+            } catch (e) {
+              console.error('❌ Failed to verify profile after timeout:', e)
+            }
+            toast.dismiss()
+          }
+
+          const message = getError(err)
+          if (message) {
+            // ✅ Show more detailed error for debugging
+            if (err.response?.status === 500) {
+              toast.error('Backend error: ' + (message || 'Internal server error'))
+            } else {
+              toast.error(message)
+            }
+          } else {
+            toast.error('Failed to save profile')
+          }
+        } finally {
+          setSaving(false)
+        }
+      }
+
+    async function handleLogoChange(e) {
+      const file = e.target.files?.[0]
+      if (!file) return
+
+      if (!profile?.nurseryName) {
+        toast.error('Please fill and save your nursery name first before uploading a logo.')
+        return
+      }
+
+      setLogoUploading(true)
+      const loadingToast = toast.loading('Compressing and uploading...')
+
        try {
-         await profileService.update({
-           ownerName:   ownerName.trim(),
-           nurseryName: nurseryName.trim(),
-           address:     address.trim(),
-           phone:       phone.trim(),
-           email:       user?.email || '',
-         })
-         // ✅ BUG FIX #4: Check if fetchProfile succeeded before navigating
-         const updated = await fetchProfile()
-         if (updated) {
-           toast.success('Profile saved!')
-           setIsEditing(false)
-           // ✅ After saving profile, redirect to dashboard
-           console.log('📌 Profile saved successfully → redirecting to /dashboard')
-           navigate('/dashboard', { replace: true })
-         } else {
-           // Profile fetch failed, show error
-           toast.error('Profile saved but failed to reload. Please refresh the page.')
-         }
-       } catch (err) {
-         const message = getError(err)
-         if (message) toast.error(message)
-       } finally {
-         setSaving(false)
-       }
-     }
+         // Upload to Supabase and save URL via PUT /profile in one call
+         const latestProfileReq = await profileService.get()
+         const latestProfile = latestProfileReq.data?.data || profile
 
-   async function handleLogoChange(e) {
-     const file = e.target.files?.[0]
-     if (!file) return
+         // ✅ Pass userId from auth context to uploadLogo
+         await profileService.uploadLogo(file, latestProfile, user?.id)
 
-     if (!profile?.nurseryName) {
-       toast.error('Please fill and save your nursery name first before uploading a logo.')
-       return
-     }
+        // ✅ Refresh profile from backend — use forceRefreshProfile to bust cache
+        // logoPreview is derived from this, so the image will update automatically
+        await forceRefreshProfile()
 
-     setLogoUploading(true)
-     const loadingToast = toast.loading('Compressing and uploading...')
-
-     try {
-       // Upload to Supabase and save URL via PUT /profile in one call
-       const latestProfileReq = await profileService.get()
-       const latestProfile = latestProfileReq.data?.data || profile
-
-       await profileService.uploadLogo(file, latestProfile)
-
-       // Refresh profile from backend — logoPreview is derived from this,
-       // so the image will update automatically via the derived value above
-       await fetchProfile()
-
-       toast.dismiss(loadingToast)
-       toast.success('Logo updated!')
-     } catch (err) {
-       toast.dismiss(loadingToast)
-       const message = getError(err)
-       if (message) toast.error(message)
-     } finally {
-       setLogoUploading(false)
-       // Reset so the same file can be selected again
-       if (fileRef.current) fileRef.current.value = ''
-     }
-   }
+        toast.dismiss(loadingToast)
+        toast.success('Logo updated!')
+      } catch (err) {
+        toast.dismiss(loadingToast)
+        const message = getError(err)
+        if (message) toast.error(message)
+      } finally {
+        setLogoUploading(false)
+        // Reset so the same file can be selected again
+        if (fileRef.current) fileRef.current.value = ''
+      }
+    }
 
   function handleLogout() {
     if (!window.confirm('Are you sure you want to sign out?')) return

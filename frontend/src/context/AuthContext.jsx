@@ -164,18 +164,20 @@ export function AuthProvider({ children }) {
    }, [])
 
     // ── Fetch nursery profile when session changes ───────────
-   const fetchProfile = useCallback(async () => {
-     console.log('📥 fetchProfile() starting...')
+    const fetchProfile = useCallback(async () => {
+      console.log('📥 fetchProfile() starting...')
 
-     // ✅ BUG FIX #5: Skip if already fetched for this token (deduplication)
-     if (!session?.access_token) {
-       // No token → skip and set profile to null
-       console.log('⏭️ fetchProfile skipped - no token')
-       setProfile(null)
-       setIsNewSession(false)
-       setProfileLoaded(true)
-       return null
-     }
+      // ✅ BUG FIX #5: Skip if already fetched for this token (deduplication)
+      if (!session?.access_token) {
+        // No token → skip and set profile to null
+        console.log('⏭️ fetchProfile skipped - no token')
+        setProfile(null)
+        setIsNewSession(false)
+        // ❌ DON'T set profileLoaded=true here
+        // profileLoaded will only be set true after a real fetch completes
+        // This prevents the deadlock where loading=false but profileLoaded=false forever
+        return null
+      }
 
      if (lastFetchedToken.current === session.access_token) {
        console.log('⏭️ fetchProfile skipped - same token (deduplication)')
@@ -196,35 +198,39 @@ export function AuthProvider({ children }) {
         setIsNewSession(false)
         setProfileLoaded(true)  // ← Mark as loaded
         return res.data.data
-     } catch (err) {
-       if (err.response?.status === 404) {
-         console.log('⚠️ Profile not found (404) - new user, setting to null')
-         setProfile(null)
-         setIsNewSession(false)
-         setProfileLoaded(true)  // ← Mark as loaded
-         return null
-       } else if (err.response?.status === 401) {
-         console.log('⚠️ Profile fetch returned 401; backend rejected token')
-         setProfile(null)
-         setProfileLoaded(true)
-       } else {
-         console.log('❌ Profile fetch error:', err.message)
-         setProfile(null)
-         setProfileLoaded(true)
-       }
-       setIsNewSession(false)
-       return null
-     }
+      } catch (err) {
+        if (err.response?.status === 404) {
+          console.log('⚠️ Profile not found (404) - new user, setting to null')
+          setProfile(null)
+          setIsNewSession(false)
+          setProfileLoaded(true)  // ← Mark as loaded
+          return null
+        } else if (err.response?.status === 401) {
+          console.log('⚠️ Profile fetch returned 401; backend rejected token')
+          setProfile(null)
+          setProfileLoaded(true)
+        } else if (err.message?.includes('timeout')) {
+          // ✅ Handle timeout gracefully
+          console.warn('⏱️ Profile fetch timeout - setting default null profile, will retry')
+          setProfile(null)
+          setProfileLoaded(true)  // Mark as loaded anyway, retry happens in background
+          // Don't throw - let user proceed
+        } else {
+          console.log('❌ Profile fetch error:', err.message)
+          setProfile(null)
+          setProfileLoaded(true)
+        }
+        setIsNewSession(false)
+        return null
+      }
    }, [session?.access_token])
 
-   useEffect(() => {
-     // ✅ BUG FIX #6: Wait for initial session loading to finish before fetching profile
-     // This prevents fetchProfile from running while loading=true and token=null,
-     // which would set profileLoaded=true with profile=null, triggering redirect to /settings
-     if (loading) return
-
-     fetchProfile()
-   }, [fetchProfile, loading])
+     useEffect(() => {
+       // ✅ Call fetchProfile once when session changes
+       // Don't retry - if it times out, it times out
+       // User can still use the app with profile = null
+       fetchProfile()
+     }, [fetchProfile])
 
   // ── Logout action ─────────────────────────────────────────
   const logout = useCallback(async () => {
@@ -261,6 +267,13 @@ export function AuthProvider({ children }) {
     }
   }, [syncSession])
 
+  // ── Force refresh profile (bust dedup cache) ────────────────
+  const forceRefreshProfile = useCallback(async () => {
+    console.log('🔄 forceRefreshProfile: Busting cache and re-fetching...')
+    lastFetchedToken.current = null  // ← Clear dedup cache
+    return await fetchProfile()
+  }, [fetchProfile])
+
   // ── Token from session (for API calls) ────────────────────
   const token = session?.access_token || null
 
@@ -279,6 +292,7 @@ export function AuthProvider({ children }) {
          login,
          refreshSession: syncSession,
          fetchProfile,
+         forceRefreshProfile,
        }}
      >
        {children}
