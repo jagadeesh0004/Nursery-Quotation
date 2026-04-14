@@ -55,7 +55,8 @@ public class NurseryProfileService {
 
         if (isNewProfile) {
             log.info("📌 New user profile created, initializing default plants for userId: {}", userId);
-            plantService.initializeDefaultPlantsForUser(userId);
+            // ✅ Call async version - doesn't block the response
+            plantService.initializeDefaultPlantsForUserAsync(userId);
         }
 
         return profileMapper.toResponse(saved);

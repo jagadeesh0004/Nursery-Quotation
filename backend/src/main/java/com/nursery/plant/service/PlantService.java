@@ -10,6 +10,7 @@ import com.nursery.plant.mapper.PlantMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -181,6 +182,17 @@ public class PlantService {
         }
 
         log.info("Default plants initialized for userId: {}", userId);
+    }
+
+    /**
+     * ✅ ASYNC version of initializeDefaultPlantsForUser.
+     * Runs in background thread, doesn't block the profile save response.
+     * Called from NurseryProfileService when a new profile is created.
+     */
+    @Async
+    @Transactional
+    public void initializeDefaultPlantsForUserAsync(UUID userId) {
+        initializeDefaultPlantsForUser(userId);
     }
 
     /**

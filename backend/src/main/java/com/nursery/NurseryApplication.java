@@ -2,7 +2,10 @@ package com.nursery;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.scheduling.annotation.EnableAsync;
 
+// ✅ Enable async processing for background tasks (e.g., plant initialization)
+@EnableAsync
 @SpringBootApplication
 public class NurseryApplication {
 
