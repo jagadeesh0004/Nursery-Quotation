@@ -10,8 +10,18 @@ ADD COLUMN IF NOT EXISTS email VARCHAR(255) NULL;
 -- ============================================================
 -- Add UNIQUE constraint on email (safe - won't fail if already exists)
 -- ============================================================
-ALTER TABLE nursery_profiles
-ADD CONSTRAINT uq_nursery_profiles_email UNIQUE (email);
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.table_constraints
+        WHERE table_schema = 'public'
+          AND table_name = 'nursery_profiles'
+          AND constraint_name = 'uq_nursery_profiles_email'
+    ) THEN
+        ALTER TABLE nursery_profiles
+        ADD CONSTRAINT uq_nursery_profiles_email UNIQUE (email);
+    END IF;
+END $$;
 
 -- ============================================================
 -- Create index for email lookups (improves query performance)

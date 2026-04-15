@@ -41,25 +41,26 @@ public class NurseryProfileService {
 
         applyProfileFields(profile, request);
 
-        NurseryProfile saved;
-        try {
-            saved = profileRepository.save(profile);
-        } catch (DataIntegrityViolationException ex) {
-            // Another request likely created the profile concurrently; retry as update.
-            NurseryProfile retryProfile = profileRepository.findByUserId(userId)
-                    .orElseThrow(() -> ex);
-            applyProfileFields(retryProfile, request);
-            saved = profileRepository.save(retryProfile);
-            isNewProfile = false;
-        }
+         NurseryProfile saved;
+         try {
+             saved = profileRepository.save(profile);
+         } catch (DataIntegrityViolationException ex) {
+             // Another request likely created the profile concurrently; retry as update.
+             NurseryProfile retryProfile = profileRepository.findByUserId(userId)
+                     .orElseThrow(() -> ex);
+             applyProfileFields(retryProfile, request);
+             saved = profileRepository.save(retryProfile);
+             isNewProfile = false;
+         }
 
-        if (isNewProfile) {
-            log.info("📌 New user profile created, initializing default plants for userId: {}", userId);
-            // ✅ Call async version - doesn't block the response
-            plantService.initializeDefaultPlantsForUserAsync(userId);
-        }
+         if (isNewProfile) {
+             log.info("📌 New user profile created, initializing default plants for userId: {}", userId);
+             // ⚠️ IMPORTANT: Async initialization needs a small delay to allow the user to be committed to DB
+             // This prevents foreign key constraint violations from race conditions
+             plantService.initializeDefaultPlantsForUserAsync(userId);
+         }
 
-        return profileMapper.toResponse(saved);
+         return profileMapper.toResponse(saved);
      }
 
     private void applyProfileFields(NurseryProfile profile, ProfileRequest request) {

@@ -16,8 +16,8 @@ CREATE TABLE users (
     version      INTEGER      NOT NULL DEFAULT 0
 );
 
-CREATE INDEX idx_users_phone ON users (phone_number);
-CREATE INDEX idx_users_deleted_at ON users (deleted_at);
+CREATE INDEX IF NOT EXISTS idx_users_phone ON users (phone_number);
+CREATE INDEX IF NOT EXISTS idx_users_deleted_at ON users (deleted_at);
 
 -- ============================================================
 -- TABLE: otps
@@ -31,8 +31,8 @@ CREATE TABLE otps (
     created_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_otps_phone ON otps (phone_number);
-CREATE INDEX idx_otps_expires ON otps (expires_at);
+CREATE INDEX IF NOT EXISTS idx_otps_phone ON otps (phone_number);
+CREATE INDEX IF NOT EXISTS idx_otps_expires ON otps (expires_at);
 
 -- ============================================================
 -- TABLE: nursery_profiles
@@ -63,12 +63,12 @@ CREATE TABLE plants (
 );
 
 -- Partial unique index: unique plant name per user when not deleted
-CREATE UNIQUE INDEX idx_plants_user_name_unique
+CREATE UNIQUE INDEX IF NOT EXISTS idx_plants_user_name_unique
     ON plants (user_id, name_normalized)
     WHERE deleted_at IS NULL;
 
-CREATE INDEX idx_plants_user_id ON plants (user_id);
-CREATE INDEX idx_plants_deleted_at ON plants (deleted_at);
+CREATE INDEX IF NOT EXISTS idx_plants_user_id ON plants (user_id);
+CREATE INDEX IF NOT EXISTS idx_plants_deleted_at ON plants (deleted_at);
 
 -- ============================================================
 -- TABLE: dimensions
@@ -84,8 +84,8 @@ CREATE TABLE dimensions (
     CONSTRAINT chk_dimension_format CHECK (dimension ~ '^\d+\s*[xX]\s*\d+$')
 );
 
-CREATE INDEX idx_dimensions_plant_id ON dimensions (plant_id);
-CREATE INDEX idx_dimensions_deleted_at ON dimensions (deleted_at);
+CREATE INDEX IF NOT EXISTS idx_dimensions_plant_id ON dimensions (plant_id);
+CREATE INDEX IF NOT EXISTS idx_dimensions_deleted_at ON dimensions (deleted_at);
 
 -- ============================================================
 -- TABLE: quotations
@@ -112,12 +112,12 @@ CREATE TABLE quotations (
     CONSTRAINT uq_quotation_user_year_seq UNIQUE (user_id, year, sequence)
 );
 
-CREATE INDEX idx_quotations_user_status ON quotations (user_id, status) WHERE deleted_at IS NULL;
-CREATE INDEX idx_quotations_customer_name ON quotations (LOWER(customer_name)) WHERE deleted_at IS NULL;
-CREATE INDEX idx_quotations_created_at ON quotations (created_at DESC);
-CREATE INDEX idx_quotations_public_token ON quotations (public_token);
-CREATE INDEX idx_quotations_deleted_at ON quotations (deleted_at);
-CREATE INDEX idx_quotations_user_year ON quotations (user_id, year);
+CREATE INDEX IF NOT EXISTS idx_quotations_user_status ON quotations (user_id, status) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_quotations_customer_name ON quotations (LOWER(customer_name)) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_quotations_created_at ON quotations (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_quotations_public_token ON quotations (public_token);
+CREATE INDEX IF NOT EXISTS idx_quotations_deleted_at ON quotations (deleted_at);
+CREATE INDEX IF NOT EXISTS idx_quotations_user_year ON quotations (user_id, year);
 
 -- ============================================================
 -- TABLE: quotation_items
@@ -133,4 +133,4 @@ CREATE TABLE quotation_items (
     created_at    TIMESTAMPTZ   NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_quotation_items_quotation_id ON quotation_items (quotation_id);
+CREATE INDEX IF NOT EXISTS idx_quotation_items_quotation_id ON quotation_items (quotation_id);

@@ -188,15 +188,44 @@ public class PlantService {
      * ✅ ASYNC version of initializeDefaultPlantsForUser.
      * Runs in background thread, doesn't block the profile save response.
      * Called from NurseryProfileService when a new profile is created.
+     *
+     * ⚠️ NOTE: Includes retry logic with delay to handle race conditions
+     * where the user might not be committed to DB yet.
      */
     @Async
     public void initializeDefaultPlantsForUserAsync(UUID userId) {
         try {
             log.info("🌱 [ASYNC] Starting plant initialization for userId: {}", userId);
-            initializeDefaultPlantsForUser(userId);
-            log.info("🌱 [ASYNC] Plant initialization completed for userId: {}", userId);
-        } catch (Exception e) {
-            log.error("❌ [ASYNC] Plant initialization failed for userId: {}", userId, e);
+
+            // Retry logic: try up to 3 times with delays to handle FK constraint issues
+            int maxRetries = 3;
+            int retryCount = 0;
+            Exception lastException = null;
+
+            while (retryCount < maxRetries) {
+                try {
+                    initializeDefaultPlantsForUser(userId);
+                    log.info("🌱 [ASYNC] Plant initialization completed for userId: {}", userId);
+                    return; // Success
+                } catch (Exception e) {
+                    lastException = e;
+                    retryCount++;
+
+                    if (retryCount < maxRetries) {
+                        long delayMs = (long) Math.pow(2, retryCount - 1) * 1000; // 1s, 2s, 4s
+                        log.warn("⚠️ [ASYNC] Plant initialization failed (attempt {}/{}), retrying in {}ms. Error: {}",
+                                 retryCount, maxRetries, delayMs, e.getMessage());
+                        Thread.sleep(delayMs);
+                    }
+                }
+            }
+
+            // All retries failed
+            log.error("❌ [ASYNC] Plant initialization failed after {} attempts for userId: {}",
+                     maxRetries, userId, lastException);
+        } catch (InterruptedException e) {
+            log.error("❌ [ASYNC] Plant initialization interrupted for userId: {}", userId, e);
+            Thread.currentThread().interrupt();
         }
     }
 
