@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.UUID;
 
 @Entity
-@Table(name = "quotations")
+@Table(name = "quotations", uniqueConstraints = @UniqueConstraint(name = "uk_user_quotation_number", columnNames = {"user_id", "quotation_number"}))
 @SQLRestriction("deleted_at IS NULL")
 @Getter
 @Setter
@@ -28,7 +28,7 @@ public class Quotation extends BaseAuditEntity {
     @Column(name = "user_id", nullable = false)
     private UUID userId;
 
-    @Column(name = "quotation_number", unique = true, length = 50)
+    @Column(name = "quotation_number", length = 50)
     private String quotationNumber;
 
     @Column(name = "year", nullable = false)
