@@ -78,13 +78,20 @@ public class NurseryProfileService {
 
     /**
      * Derives initials from the nursery name for quotation numbering.
-     * e.g. "Green Valley Nursery" -> "GVN"
+     * Takes first letter of each word (up to 4), pads with zeros if less than 4 words.
+     * e.g. "Go Green Nursery Ltd" -> "GGNL"
+     * e.g. "Go Green Nursery" -> "GGN0"
+     * e.g. "Go Green" -> "GG00"
+     * e.g. "Green" -> "G000"
      */
     public String deriveInitials(String nurseryName) {
-        return Arrays.stream(nurseryName.trim().split("\\s+"))
+        String initials = Arrays.stream(nurseryName.trim().split("\\s+"))
                 .filter(w -> !w.isEmpty())
                 .map(w -> String.valueOf(w.charAt(0)).toUpperCase())
-                .limit(3)
+                .limit(4)
                 .reduce("", String::concat);
+
+        // Pad with zeros to make exactly 4 characters
+        return String.format("%-4s", initials).replace(' ', '0');
     }
 }

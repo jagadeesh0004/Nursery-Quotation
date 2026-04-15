@@ -12,12 +12,16 @@ import java.time.Year;
 import java.util.UUID;
 
 /**
- * Generates quotation numbers in the format: ABCDXXXX (8 characters)
+ * Generates quotation numbers in the format: AAAABBBB (8 characters)
  *
- * - ABCD  = first letter of each word in nursery name (uppercase)
- * - XXXX  = zero-padded sequential number (4 digits, e.g., 0001, 0002, etc.)
+ * - AAAA  = first letter of each word in nursery name (up to 4), padded with zeros
+ * - BBBB  = zero-padded sequential number (4 digits, e.g., 0001, 0002, etc.)
  *
- * Example: SUNS0001 (Sri Uma Nursery Suppliers, sequence 1)
+ * Examples:
+ *   "Go Green Nursery Ltd" → GGNL0001, GGNL0002
+ *   "Go Green Nursery" → GGN00001, GGN00002
+ *   "Go Green" → GG000001, GG000002
+ *   "Garden" → G0000001, G0000002
  */
 @Slf4j
 @Service
