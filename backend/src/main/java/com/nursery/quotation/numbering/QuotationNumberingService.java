@@ -42,14 +42,17 @@ public class QuotationNumberingService {
             int nextSequence = baseSequence + 1 + attempt;
             String number = String.format("%s%04d", initials, nextSequence);
 
-            if (!quotationRepository.existsByQuotationNumber(number)) {
-                log.debug("Generated quotation number: {} for userId: {}", number, userId);
+            // ✅ Check uniqueness per-user, not globally
+            if (!quotationRepository.existsByUserIdAndQuotationNumber(userId, number)) {
+                log.debug("✅ Generated quotation number: {} for userId: {}", number, userId);
                 return new GeneratedNumber(number, currentYear, nextSequence);
             }
 
+            log.debug("⏭️  Number {} already exists for user, trying next sequence...", number);
             attempt++;
         }
 
+        // ❌ This should rarely happen now - only if 5 sequential numbers collide
         throw new BusinessException("Unable to generate a unique quotation number. Please try again.");
     }
 

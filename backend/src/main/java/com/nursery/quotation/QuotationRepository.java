@@ -38,6 +38,9 @@ public interface QuotationRepository extends JpaRepository<Quotation, Long> {
 
     boolean existsByQuotationNumber(String quotationNumber);
 
+    @Query("SELECT COUNT(q) > 0 FROM Quotation q WHERE q.userId = :userId AND q.quotationNumber = :quotationNumber")
+    boolean existsByUserIdAndQuotationNumber(UUID userId, String quotationNumber);
+
     // ─── Analytics ───────────────────────────────────────────────────
 
     long countByUserId(UUID userId);
