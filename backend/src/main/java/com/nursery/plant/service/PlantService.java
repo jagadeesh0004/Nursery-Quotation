@@ -10,6 +10,7 @@ import com.nursery.plant.mapper.PlantMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,8 +31,9 @@ public class PlantService {
     private final PlantRepository plantRepository;
     private final DimensionRepository dimensionRepository;
     private final PlantMapper plantMapper;
+    private final JdbcTemplate jdbcTemplate;
 
-    // ─── Catalog Read ────────────────────────────────────────────────
+    // ...existing code...
 
     @Transactional(readOnly = true)
     public List<PlantResponse> getAllPlants(UUID userId) {
@@ -119,6 +121,10 @@ public class PlantService {
      */
     @Transactional
     public void findOrCreatePlantWithDimension(UUID userId, String plantName, String dimension) {
+        // CRITICAL: Ensure user exists in DB before inserting plants
+        // This prevents FK constraint violations when user ID comes from JWT
+        ensureUserExists(userId);
+
         String normalizedName = normalize(plantName);
         String normalizedDim  = normalizeDimension(dimension);
 
@@ -149,6 +155,9 @@ public class PlantService {
     @Transactional
     public void initializeDefaultPlantsForUser(UUID userId) {
         log.info("Initializing default plants for userId: {}", userId);
+        
+        // Ensure user exists in DB before adding plants
+        ensureUserExists(userId);
 
         List<PlantInitializationData> defaultPlants = getDefaultPlantsData();
 
@@ -379,5 +388,44 @@ public class PlantService {
 
     public String normalizeDimension(String dim) {
         return dim.trim().replaceAll("\\s*[xX]\\s*", "x").toLowerCase();
+    }
+
+    /**
+     * ✅ CRITICAL FIX: Ensures user exists in the database.
+     *
+     * This prevents FK constraint violations when:
+     * 1. User ID comes from JWT token (Supabase)
+     * 2. User hasn't created a profile yet
+     * 3. User tries to create a quotation/plant directly
+     *
+     * Creates a minimal user record if it doesn't exist.
+     *
+     * @param userId User UUID from JWT token
+     */
+    private void ensureUserExists(UUID userId) {
+        try {
+            String checkUserSql = "SELECT 1 FROM users WHERE id = ?::uuid LIMIT 1";
+            Integer exists = jdbcTemplate.queryForObject(checkUserSql, Integer.class, userId.toString());
+
+            if (exists != null) {
+                return; // User already exists
+            }
+        } catch (Exception e) {
+            // User doesn't exist, continue to create
+        }
+
+        try {
+            String insertUserSql = "INSERT INTO users (id, auth_method, created_at, updated_at) " +
+                                  "VALUES (?::uuid, 'GOOGLE', NOW(), NOW()) " +
+                                  "ON CONFLICT (id) DO NOTHING";
+            int inserted = jdbcTemplate.update(insertUserSql, userId.toString());
+
+            if (inserted > 0) {
+                log.info("✅ Auto-created user record for userId: {}", userId);
+            }
+        } catch (Exception e) {
+            log.warn("⚠️ Could not ensure user exists for userId: {}. Error: {}", userId, e.getMessage());
+            // Don't throw - let the plant insert happen and catch FK violation if needed
+        }
     }
 }
