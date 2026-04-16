@@ -1,0 +1,266 @@
+================================================================================
+QUOTATION NUMBER SYSTEM - VISUAL FLOWS & DIAGRAMS
+================================================================================
+
+FLOW 1: QUOTATION CREATION FLOW (DRAFT)
+================================================================================
+
+User Input                QuotationService              Database
+   │                            │                            │
+   ├─ Create DRAFT             │                            │
+   │  (no finalize)            │                            │
+   └─ POST /quotations ────────>│                            │
+                          ├─ Build Quotation            │
+                          │  - status = DRAFT           │
+                          │  - quotationNumber = NULL   │
+                          │  - userId = from JWT        │
+                          │  - year = 2026              │
+                          │                             │
+                          ├─ Apply items                │
+                          ├─ Calculate totals           │
+                          │  (NO number assignment)     │
+                          │                             │
+                          ├─ save() ─────────────────────>
+                          │                      ├─ INSERT
+                          │                      ├─ Check FK
+                          │                      └─ Return ID
+                          │ <───────────────────
+                          │                             │
+                          └─ Return Response           │
+   <─────────────────────────────────────────────────────
+     {id, status: DRAFT, quotationNumber: null}
+
+
+FLOW 2: QUOTATION FINALIZATION FLOW (GENERATE NUMBER)
+================================================================================
+
+User Input                  Service Layer              Repository            Database
+   │                             │                         │                    │
+   ├─ Finalize DRAFT ──────────>│                          │                    │
+   │  (update + finalize=true)  │                          │                    │
+   │                      ├─ Validate data               │                    │
+   │                      │  (customer, items)           │                    │
+   │                      │                              │                    │
+   │                      ├─ Update quotation            │                    │
+   │                      │  - status = FINAL            │                    │
+   │                      │  - finalizedAt = NOW         │                    │
+   │                      │                              │                    │
+   │                      ├─ assignQuotationNumber()    │                    │
+   │                      │    (CRITICAL SECTION)        │                    │
+   │                      │                              │                    │
+   │                      ├─ numberingService.generate()│                    │
+   │                      │  │                           │                    │
+   │                      │  ├─ Get profile ────────────>│ GET profile        │
+   │                      │  │                           ├─ Find by userId ──>
+   │                      │  │                           │         [NurseryProfile]
+   │                      │  │                    <──────┤ initials = "GGNL"  │
+   │                      │  │                           │                    │
+   │                      │  ├─ Get max sequence ───────>│ SELECT MAX(seq)    │
+   │                      │  │                           │ WHERE user=?       │
+   │                      │  │                           │ AND year=2026 ────>
+   │                      │  │                           │         baseSeq=5  │
+   │                      │  │                    <──────┤                    │
+   │                      │  │                           │                    │
+   │                      │  ├─ Calculate next           │                    │
+   │                      │  │  nextSeq = 5 + 1 = 6      │                    │
+   │                      │  │  number = "GGNL" + "0006" │                    │
+   │                      │  │  = "GGNL0006"             │                    │
+   │                      │  │                           │                    │
+   │                      │  ├─ Check uniqueness ──────>│ EXIST?             │
+   │                      │  │                           │ WHERE user=? AND   │
+   │                      │  │                           │ number=? ─────────>
+   │                      │  │                           │      EXISTS=False  │
+   │                      │  │                    <──────┤                    │
+   │                      │  │                           │                    │
+   │                      │  └─ Return "GGNL0006"        │                    │
+   │                      │                              │                    │
+   │                      ├─ setQuotationNumber("GGNL0006")                  │
+   │                      ├─ setYear(2026)              │                    │
+   │                      ├─ setSequence(6)             │                    │
+   │                      │                              │                    │
+   │                      ├─ save() ─────────────────────>│ INSERT quotation  │
+   │                      │                              │ WITH number ──────>
+   │                      │                              │    ├─ Check FK    │
+   │                      │                              │    ├─ Check UK    │
+   │                      │                              │    │ (user_id,    │
+   │                      │                              │    │  number)     │
+   │                      │                              │    └─ Commit     │
+   │                      │ <──────────────────────────────              │
+   │                      │                              │                    │
+   └─ Return Response <────┤                              │                    │
+     {id, quotationNumber: "GGNL0006", status: FINAL}
+
+
+FLOW 3: RACE CONDITION SCENARIO (CURRENT - UNSAFE)
+================================================================================
+
+Thread A                        Thread B
+   │                               │
+   ├─ SELECT MAX(seq)=5    ├─ SELECT MAX(seq)=5
+   │ (returns 5)           │ (returns 5 at same time)
+   │                               │
+   ├─ Calculate: 5+1=6     ├─ Calculate: 5+1=6
+   │                               │
+   ├─ Check GG0006 ─────────┐
+   │ EXISTS=FALSE           │
+   │                        │
+   ├─ Insert GG0006   ├─ Check GG0006
+   │                  │ EXISTS=FALSE
+   │                  │
+   │                  ├─ Insert GG0006 ← COLLISION!
+   │                  │   (Unique constraint error)
+   │                  │   ↓ FAILS
+   ├─ SUCCESS        └─ RETRY (with attempt+1)
+   │                     ├─ Calculate: 5+2=7
+   │                     ├─ Try GG0007
+   │                     └─ SUCCESS (retry worked)
+
+RESULT: Thread A gets GG0006, Thread B gets GG0007 after retry
+PROBLEM: Wastes attempts, adds latency, confusing logs
+
+
+FLOW 4: RACE CONDITION FIX (PROPOSED - WITH LOCKING)
+================================================================================
+
+Thread A                              Thread B
+   │                                     │
+   ├─ SELECT MAX(seq) FOR UPDATE  ├─ SELECT MAX(seq) FOR UPDATE
+   │ (acquires lock)              │ (waits for lock... BLOCKED)
+   │                                     │
+   ├─ Calculate: 5+1=6
+   │
+   ├─ Release lock
+   │                              ├─ Lock acquired
+   │                              │
+   │                              ├─ SELECT returns 6 (updated)
+   │                              ├─ Calculate: 6+1=7
+   │                              │
+   │                              ├─ Release lock
+   │
+   ├─ Insert GG0006       ├─ Insert GG0007
+   │ SUCCESS              │ SUCCESS
+
+RESULT: No collision, no retry needed, correct sequence
+TIME: Slightly more latency due to lock waiting, but consistent
+
+
+FLOW 5: DUPLICATE QUOTATION FLOW
+================================================================================
+
+User Input              QuotationService           Database
+   │                          │                        │
+   ├─ Duplicate FINAL ────────>│                        │
+   │  (POST /duplicate)        │                        │
+   │                     ├─ Find source ────────────>
+   │                     │                    ├─ SELECT
+   │                     │ <─ Return source ──
+   │                     │                        │
+   │                     ├─ Copy quotation       │
+   │                     │  - New Quotation obj  │
+   │                     │  - status = DRAFT     │
+   │                     │  - quotationNumber=NULL  (KEY!)
+   │                     │  - Copy all items     │
+   │                     │  - Copy customer info │
+   │                     │  - Copy total amount  │
+   │                     │                        │
+   │                     ├─ Calculate totals     │
+   │                     │                        │
+   │                     ├─ save() ─────────────>
+   │                     │                ├─ INSERT new row
+   │                     │ <─ Return ─────
+   │                     │                        │
+   └─ Response <─────────┤                        │
+     New DRAFT quotation with NULL number
+     User can edit and finalize later
+
+
+FLOW 6: SOFT DELETE FLOW
+================================================================================
+
+Current State                  After Soft Delete
+┌──────────────────────┐      ┌──────────────────────┐
+│ Quotation           │      │ Quotation           │
+├──────────────────────┤      ├──────────────────────┤
+│ id: 123             │      │ id: 123             │
+│ quotation_number: GG│      │ quotation_number: GG│
+│                0003 │      │                0003 │
+│ status: FINAL       │      │ status: FINAL       │
+│ deleted_at: NULL    │      │ deleted_at: 2026... │
+│ created_at: 2026... │ ──>  │ created_at: 2026... │
+│ updated_at: 2026... │      │ updated_at: 2026... │
+└──────────────────────┘      └──────────────────────┘
+
+Query with @SQLRestriction("deleted_at IS NULL"):
+- Before: Quotation found
+- After: Quotation NOT found
+
+ISSUE:
+- Sequence counter query does NOT filter deleted_at
+- So GG0003 counted in MAX(sequence)
+- But not visible to user
+- Creates "gap" in sequence visibility
+
+
+FLOW 7: QUOTATION STATUS LIFECYCLE
+================================================================================
+
+┌─────────────┐
+│  DRAFT      │
+└────┬────────┘
+     │
+     ├─ Edit ──────────> DRAFT (same state)
+     │
+     ├─ Auto-save ─────> DRAFT (same state)
+     │
+     ├─ Finalize ──────> FINAL (assign number here!)
+     │                   ├─ quotationNumber = "GG0001"
+     │                   ├─ year = 2026
+     │                   ├─ sequence = 1
+     │                   ├─ finalizedAt = NOW
+     │                   ├─ publicToken = random
+     │                   └─ status = FINAL
+     │
+     └─ Delete ────────> DELETED (soft delete)
+                         ├─ deleted_at = NOW
+                         ├─ Not returned in queries
+                         └─ Can be restored (update deleted_at=NULL)
+
+KEY POINT: quotationNumber assigned only when transitioning DRAFT → FINAL
+
+
+FLOW 8: INITIALS EXTRACTION (From Nursery Name)
+================================================================================
+
+Input Nursery Name      Extraction Logic        Output Initials
+─────────────────────────────────────────────────────────────
+"Go Green Nursery"    ─> G + G + N + ??? ──>  "GGN"
+                                (pad with 0)   = "GGN0"
+
+"Go Green Nursery Ltd" ─> G + G + N + L ──>   "GGNL"
+
+"Green"               ─> G + ??? + ??? + ??? → "G000"
+                                (pad with 0s)
+
+"ABC Nursery Prod Ltd" ─> A + N + P + L ──>   "ANPL"
+
+CURRENT IMPLEMENTATION:
+Profile.initials is manually set (not auto-extracted)
+User must provide or system calculates somehow
+
+RECOMMENDATION:
+Add logic to auto-extract from nursery_name:
+```
+String[] words = nurseryName.trim().split("\\s+");
+String initials = "";
+for (int i = 0; i < Math.min(words.length, 4); i++) {
+    if (!words[i].isEmpty()) {
+        initials += words[i].charAt(0);
+    }
+}
+initials = initials.toUpperCase();
+// Pad if needed
+while (initials.length() < 1) initials += "0";
+```
+
+================================================================================
+
