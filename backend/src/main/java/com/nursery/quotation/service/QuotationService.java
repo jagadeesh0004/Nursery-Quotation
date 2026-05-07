@@ -4,6 +4,8 @@ import com.nursery.common.exception.BusinessException;
 import com.nursery.common.exception.ResourceNotFoundException;
 import com.nursery.common.response.PageResponse;
 import com.nursery.plant.service.PlantService;
+import com.nursery.profile.NurseryProfile;
+import com.nursery.profile.NurseryProfileRepository;
 import com.nursery.quotation.*;
 import com.nursery.quotation.dto.QuotationDtos.*;
 import com.nursery.quotation.mapper.QuotationMapper;
@@ -31,6 +33,7 @@ import java.util.UUID;
 public class QuotationService {
 
     private final QuotationRepository quotationRepository;
+    private final NurseryProfileRepository profileRepository;
     private final QuotationMapper quotationMapper;
     private final QuotationNumberingService numberingService;
     private final CalculationEngine calculationEngine;
@@ -78,7 +81,7 @@ public class QuotationService {
     @Transactional(readOnly = true)
     public QuotationResponse getQuotation(UUID userId, Long quotationId) {
         Quotation quotation = findOwnedQuotation(userId, quotationId);
-        return quotationMapper.toResponse(quotation);
+        return buildResponseWithNurseryDetails(quotation);
     }
 
     @Transactional(readOnly = true)
@@ -229,7 +232,7 @@ public class QuotationService {
             throw new BusinessException("This quotation link has expired.");
         }
 
-        return quotationMapper.toResponse(quotation);
+        return buildResponseWithNurseryDetails(quotation);
     }
 
     // ─── Helpers ──────────────────────────────────────────────────────
@@ -300,5 +303,34 @@ public class QuotationService {
         } catch (IllegalArgumentException e) {
             throw new BusinessException("Invalid status. Must be DRAFT or FINAL.");
         }
+    }
+
+    /**
+     * Helper: Build QuotationResponse with nursery details from NurseryProfile
+     */
+    private QuotationResponse buildResponseWithNurseryDetails(Quotation quotation) {
+        NurseryProfile profile = profileRepository.findById(quotation.getUserId()).orElse(null);
+        
+        QuotationResponse baseResponse = quotationMapper.toResponse(quotation);
+        
+        // Create a new response with nursery details
+        return new QuotationResponse(
+                baseResponse.id(),
+                baseResponse.quotationNumber(),
+                baseResponse.status(),
+                baseResponse.customerName(),
+                baseResponse.customerPhone(),
+                baseResponse.customerAddress(),
+                profile != null ? profile.getNurseryName() : null,
+                profile != null ? profile.getAddress() : null,
+                profile != null ? profile.getPhone() : null,
+                profile != null ? profile.getOwnerName() : null,
+                baseResponse.items(),
+                baseResponse.totalAmount(),
+                baseResponse.publicToken(),
+                baseResponse.finalizedAt(),
+                baseResponse.createdAt(),
+                baseResponse.updatedAt()
+        );
     }
 }
