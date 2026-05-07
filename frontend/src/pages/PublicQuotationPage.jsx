@@ -96,7 +96,8 @@ export default function PublicQuotationPage() {
           {/* Header */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 p-4 sm:p-6 bg-green-50 border-b border-green-100">
             <div>
-              <h2 className="text-xl font-bold text-green-900 mb-2">{displayNurseryName}</h2>
+              <h2 className="text-xl font-bold text-green-900 mb-1">{displayNurseryName}</h2>
+              {q.nurseryOwnerName && <p className="text-xs text-muted font-semibold mb-2">Proprietor: {q.nurseryOwnerName}</p>}
               {q.nurseryAddress && (
                 <div className="flex items-start gap-1.5 text-sm text-muted mb-1">
                   <MapPin className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" strokeWidth={1.5} /> {q.nurseryAddress}
