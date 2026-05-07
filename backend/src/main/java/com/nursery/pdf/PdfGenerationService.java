@@ -45,9 +45,11 @@ public class PdfGenerationService {
                 .findByUserId(quotation.getUserId())
                 .orElse(null);
 
-        int totalQuantity = quotation.getItems().stream()
-                .mapToInt(item -> item.getQuantity() == null ? 0 : item.getQuantity())
-                .sum();
+        int totalQuantity = (quotation.getItems() != null) 
+                ? quotation.getItems().stream()
+                        .mapToInt(item -> item.getQuantity() == null ? 0 : item.getQuantity())
+                        .sum()
+                : 0;
 
         String html = buildQuotationHtml(quotation, profile, totalQuantity);
 
@@ -213,8 +215,9 @@ public class PdfGenerationService {
         sb.append("</thead>");
         sb.append("<tbody>");
         int idx = 1;
-        for (QuotationItem item : quotation.getItems()) {
-            if (item.getPlantName() == null || item.getPlantName().isBlank()) continue;
+        if (quotation.getItems() != null) {
+            for (QuotationItem item : quotation.getItems()) {
+                if (item.getPlantName() == null || item.getPlantName().isBlank()) continue;
             String bg = (idx % 2 == 0) ? "#fafbfc" : "#ffffff";
             sb.append("<tr style=\"background:").append(bg).append(";\">");
             sb.append("<td style=\"padding:12px 8px; text-align:center; font-size:12px; color:#333; border:1px solid #e0e0e0; border-left:none;\">").append(idx).append("</td>");
@@ -225,6 +228,7 @@ public class PdfGenerationService {
             sb.append("<td style=\"padding:12px 8px; text-align:right;  font-size:12px; color:#333; font-weight:500; border:1px solid #e0e0e0; border-right:none;\">").append(formatMoney(item.getItemTotal())).append("</td>");
             sb.append("</tr>");
             idx++;
+            }
         }
         sb.append("</tbody>");
         sb.append("</table>");
