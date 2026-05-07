@@ -238,7 +238,7 @@ export default function QuotationFormPage() {
 
         {/* Column headers */}
         <div className="hidden sm:grid grid-cols-12 gap-3 mb-2 px-1">
-          {[['Plant Name','col-span-4'],['Bag Size','col-span-3'],['Price / Pc','col-span-2'],['Qty','col-span-1'],['Total','col-span-1 text-right'],['','col-span-1']].map(([h, cls]) => (
+          {[['Plant Name','col-span-4'],['Bag Size','col-span-3'],['Qty','col-span-1'],['Price / Pc','col-span-2'],['Total','col-span-1 text-right'],['','col-span-1']].map(([h, cls]) => (
             <span key={h} className={cx('text-[11px] font-semibold text-muted uppercase tracking-wide', cls)}>{h}</span>
           ))}
         </div>
@@ -371,6 +371,14 @@ export default function QuotationFormPage() {
                     )}
                   </div>
 
+                  {/* Qty */}
+                  <div className="col-span-4 sm:col-span-1 flex flex-col">
+                    <label className="sm:hidden block text-[10px] font-semibold text-muted uppercase text-center mb-1.5 whitespace-nowrap">Qty</label>
+                    <input type="number" min="1" placeholder="1"
+                      value={item.quantity} onChange={e => updateItem(idx, 'quantity', e.target.value)}
+                      className="field w-full text-sm text-center font-mono bg-white" />
+                  </div>
+
                   {/* Price — required number with visible validation */}
                   <div className="col-span-6 sm:col-span-2 flex flex-col">
                     <label className="sm:hidden block text-[10px] font-semibold text-muted uppercase mb-1.5 whitespace-nowrap">Price/Pc</label>
@@ -383,14 +391,6 @@ export default function QuotationFormPage() {
                           errors.itemRows?.[idx] && 'field-error border-red-400')} />
                     </div>
                     {errors.itemRows?.[idx] && <p className="text-[10px] text-red-500 mt-1 max-w-full truncate">{errors.itemRows[idx]}</p>}
-                  </div>
-
-                  {/* Qty */}
-                  <div className="col-span-4 sm:col-span-1 flex flex-col">
-                    <label className="sm:hidden block text-[10px] font-semibold text-muted uppercase text-center mb-1.5 whitespace-nowrap">Qty</label>
-                    <input type="number" min="1" placeholder="1"
-                      value={item.quantity} onChange={e => updateItem(idx, 'quantity', e.target.value)}
-                      className="field w-full text-sm text-center font-mono bg-white" />
                   </div>
 
                   {/* Row total */}
