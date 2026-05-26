@@ -17,11 +17,13 @@ public class QuotationDtos {
             @Size(max = 150, message = "Plant name must not exceed 150 characters")
             String plantName,
 
-            @NotBlank(message = "Dimension is required")
-            @Pattern(regexp = "^\\d+\\s*[xX]\\s*\\d+$",
-                    message = "Dimension must follow format: number x number")
-            @Size(max = 20)
-            String dimension,
+             @NotBlank(message = "Dimension is required")
+             @Pattern(
+                 regexp = "(^\\d+\\s*[xX]\\s*\\d+$)|(^[Pp]ot$)|(^\\d+\"\\s*[Pp]ot$)",
+                 message = "Dimension must be a bag size (number x number) or a pot size (pot or number\" pot, e.g., 12\" pot)"
+             )
+             @Size(max = 20)
+             String dimension,
 
             @NotNull(message = "Quantity is required")
             @Min(value = 1, message = "Quantity must be at least 1")

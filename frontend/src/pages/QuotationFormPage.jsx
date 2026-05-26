@@ -88,7 +88,7 @@ export default function QuotationFormPage() {
   function validate(shouldFinalize) {
     const errs = {}
 
-    if (!customerName.trim()) {
+    if (shouldFinalize && !customerName.trim()) {
       errs.customerName = 'Customer name is required'
     }
 
@@ -119,7 +119,7 @@ export default function QuotationFormPage() {
     const currentErrs = validate(shouldFinalize)
     if (Object.keys(currentErrs).length > 0) {
       if (currentErrs.customerName) {
-        toast.error('Please add the customer details (Name) to save')
+        toast.error('Please add the customer name before finalizing')
       } else if (currentErrs.items) {
         toast.error(currentErrs.items)
       } else {
@@ -196,7 +196,7 @@ export default function QuotationFormPage() {
 
   if (pageLoading) return (
     <div className="flex items-center justify-center h-64 gap-3 text-muted">
-      <Spinner size="md" /> Loading quotation…
+      <Spinner size="md" /> Loading quotation...
     </div>
   )
 
@@ -238,7 +238,14 @@ export default function QuotationFormPage() {
 
         {/* Column headers */}
         <div className="hidden sm:grid grid-cols-12 gap-3 mb-2 px-1">
-          {[['Plant Name','col-span-4'],['Bag Size','col-span-3'],['Qty','col-span-1'],['Price / Pc','col-span-2'],['Total','col-span-1 text-right'],['','col-span-1']].map(([h, cls]) => (
+          {[
+            ['Plant Name','col-span-4'],
+            ['Bag / Pot Size','col-span-3'],
+            ['Qty','col-span-1'],
+            ['Price / Pc','col-span-2'],
+            ['Total','col-span-1 text-right'],
+            ['','col-span-1']
+          ].map(([h, cls]) => (
             <span key={h} className={cx('text-[11px] font-semibold text-muted uppercase tracking-wide', cls)}>{h}</span>
           ))}
         </div>
@@ -325,7 +332,7 @@ export default function QuotationFormPage() {
 
                   {/* Dimension */}
                   <div className="col-span-6 sm:col-span-3 flex flex-col relative">
-                    <label className="sm:hidden block text-[10px] font-semibold text-muted uppercase mb-1.5 whitespace-nowrap">Bag Size</label>
+                    <label className="sm:hidden block text-[10px] font-semibold text-muted uppercase mb-1.5 whitespace-nowrap">Bag / Pot Size</label>
                     <input type="text"
                       autoComplete="off"
                       value={item.dimension}
@@ -335,7 +342,7 @@ export default function QuotationFormPage() {
                       }}
                       onFocus={() => setActiveDimSearch(idx)}
                       onBlur={() => setTimeout(() => setActiveDimSearch(null), 200)}
-                      placeholder="Size (e.g. 5x5)"
+                       placeholder='Size (e.g. 5x5, pot, or 12" Pot)'
                       className="field bg-white w-full text-sm" />
 
                     {/* Custom Dropdown for Dimensions */}

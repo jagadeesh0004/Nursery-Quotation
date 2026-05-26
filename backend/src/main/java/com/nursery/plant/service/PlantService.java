@@ -128,6 +128,12 @@ public class PlantService {
         String normalizedName = normalize(plantName);
         String normalizedDim  = normalizeDimension(dimension);
 
+        if (!isSupportedDimensionFormat(normalizedDim)) {
+            throw new BusinessException(
+                    "Dimension must be a bag size (for example 8x10) or a pot size (for example pot or 12\" pot)."
+            );
+        }
+
         Plant plant = plantRepository.findByUserIdAndNameNormalized(userId, normalizedName)
                 .orElseGet(() -> {
                     Plant newPlant = Plant.builder()
@@ -178,6 +184,11 @@ public class PlantService {
             // Add dimensions with zero price
             for (String bagSize : plantData.bagSizes()) {
                 String normalizedDim = normalizeDimension(bagSize);
+
+                if (!isSupportedDimensionFormat(normalizedDim)) {
+                    log.warn("Skipping unsupported default dimension '{}' for plant '{}'", bagSize, plantData.plantName());
+                    continue;
+                }
 
                 if (!dimensionRepository.existsByPlantIdAndDimension(plant.getId(), normalizedDim)) {
                     Dimension dimension = Dimension.builder()
@@ -387,7 +398,25 @@ public class PlantService {
     }
 
     public String normalizeDimension(String dim) {
-        return dim.trim().replaceAll("\\s*[xX]\\s*", "x").toLowerCase();
+        String trimmed = dim.trim();
+        // For bag sizes (number x number): normalize x separator and keep lowercase
+        if (trimmed.matches("^\\d+\\s*[xX]\\s*\\d+$")) {
+            return trimmed.replaceAll("\\s*[xX]\\s*", "x").toLowerCase();
+        }
+        // For plain pot dimensions: normalize case
+        if (trimmed.equalsIgnoreCase("pot")) {
+            return "pot";
+        }
+        // For sized pot dimensions (number" Pot): normalize to lowercase "pot"
+        if (trimmed.matches("^\\d+\"\\s*[Pp]ot$")) {
+            return trimmed.replaceAll("\"\\s*[Pp]ot$", "\" pot");
+        }
+        // Fallback: return as-is
+        return trimmed;
+    }
+
+    private boolean isSupportedDimensionFormat(String dimension) {
+        return dimension.matches("(^\\d+x\\d+$)|(^pot$)|(^\\d+\"\\s*pot$)");
     }
 
     /**

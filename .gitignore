@@ -28,7 +28,7 @@ credentials.json
 *.md
 !README.md
 *.sql
-!src/main/resources/db/migration/*.sql
+!backend/src/main/resources/db/migration/*.sql
 .DS_Store
 Thumbs.db
 

@@ -1,5 +1,6 @@
 package com.nursery.profile.service;
 
+import com.nursery.common.exception.BusinessException;
 import com.nursery.common.exception.ResourceNotFoundException;
 import com.nursery.plant.service.PlantService;
 import com.nursery.profile.NurseryProfile;
@@ -14,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Arrays;
+import java.util.Locale;
 import java.util.UUID;
 
 @Slf4j
@@ -26,10 +28,26 @@ public class NurseryProfileService {
     private final FileStorageService fileStorageService;
     private final PlantService plantService;
 
-    @Transactional(readOnly = true)
+    @Transactional
     public ProfileResponse getProfile(UUID userId) {
         NurseryProfile profile = profileRepository.findByUserId(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("Nursery profile not found. Please set up your profile."));
+                .orElseGet(() -> {
+                    // Auto-create default profile for new users
+                    NurseryProfile newProfile = NurseryProfile.builder()
+                        .userId(userId)
+                        .nurseryName("New Nursery")
+                        .ownerName("Owner")
+                        .address("")
+                        .phone("")
+                        .email(null)
+                        .logoPath(null)
+                        .initials("NN00")
+                        .build();
+                    NurseryProfile saved = profileRepository.save(newProfile);
+                    log.info("[AUTO] Created default profile for userId: {}", userId);
+                    plantService.initializeDefaultPlantsForUserAsync(userId);
+                    return saved;
+                });
         return profileMapper.toResponse(profile);
     }
 
@@ -39,15 +57,20 @@ public class NurseryProfileService {
         boolean isNewProfile = existingProfile.isEmpty();
         NurseryProfile profile = existingProfile.orElseGet(() -> NurseryProfile.builder().userId(userId).build());
 
+        validateUniqueEmail(userId, request.email());
         applyProfileFields(profile, request);
 
          NurseryProfile saved;
          try {
              saved = profileRepository.save(profile);
          } catch (DataIntegrityViolationException ex) {
+             if (isEmailConstraintViolation(ex)) {
+                 throw new BusinessException("That email address is already being used by another profile.");
+             }
              // Another request likely created the profile concurrently; retry as update.
              NurseryProfile retryProfile = profileRepository.findByUserId(userId)
                      .orElseThrow(() -> ex);
+             validateUniqueEmail(userId, request.email());
              applyProfileFields(retryProfile, request);
              saved = profileRepository.save(retryProfile);
              isNewProfile = false;
@@ -68,13 +91,31 @@ public class NurseryProfileService {
         profile.setOwnerName(request.ownerName());
         profile.setAddress(request.address());
         profile.setPhone(request.phone());
-        if (request.email() != null) {
-            profile.setEmail(request.email());
-        }
-        if (request.logoPath() != null) {
-            profile.setLogoPath(request.logoPath());
-        }
+        profile.setEmail(normalizeOptional(request.email()));
+        profile.setLogoPath(normalizeOptional(request.logoPath()));
         profile.setInitials(deriveInitials(request.nurseryName()));
+    }
+
+    private void validateUniqueEmail(UUID userId, String email) {
+        String normalizedEmail = normalizeOptional(email);
+        if (normalizedEmail != null && profileRepository.existsByEmailIgnoreCaseAndUserIdNot(normalizedEmail, userId)) {
+            throw new BusinessException("That email address is already being used by another profile.");
+        }
+    }
+
+    private String normalizeOptional(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private boolean isEmailConstraintViolation(DataIntegrityViolationException ex) {
+        String message = ex.getMostSpecificCause() != null
+                ? ex.getMostSpecificCause().getMessage()
+                : ex.getMessage();
+        return message != null && message.toLowerCase(Locale.ROOT).contains("uq_nursery_profiles_email");
     }
 
     /**

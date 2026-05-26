@@ -17,17 +17,19 @@ public class PlantDtos {
             String name
     ) {}
 
-    public record AddDimensionRequest(
-            @NotBlank(message = "Dimension is required")
-            @Pattern(regexp = "^\\d+\\s*[xX]\\s*\\d+$",
-                    message = "Dimension must follow format: number x number (e.g., 5x7, 8 x 10)")
-            @Size(max = 20, message = "Dimension must not exceed 20 characters")
-            String dimension,
+     public record AddDimensionRequest(
+             @NotBlank(message = "Dimension is required")
+                 @Pattern(
+                     regexp = "(^\\d+\\s*[xX]\\s*\\d+$)|(^[Pp]ot$)|(^\\d+\"\\s*[Pp]ot$)",
+                     message = "Dimension must be a bag size (number x number) or a pot size (pot or number\" pot, e.g., 12\" pot)"
+                 )
+             @Size(max = 20, message = "Dimension must not exceed 20 characters")
+             String dimension,
 
-            @NotNull(message = "Price is required")
-            @DecimalMin(value = "0.0", message = "Price must be zero or greater")
-            java.math.BigDecimal price
-    ) {}
+             @NotNull(message = "Price is required")
+             @DecimalMin(value = "0.0", message = "Price must be zero or greater")
+             java.math.BigDecimal price
+     ) {}
 
     public record DimensionResponse(
             Long id,
