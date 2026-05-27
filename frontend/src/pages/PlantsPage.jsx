@@ -23,6 +23,8 @@ import { formatCurrency, getError, cx } from '../utils'
 
 // ── Blank dimension row template ─────────────────────────────
 const newDimRow = () => ({ dimension: '', price: '' })
+const DIMENSION_FORMAT_HINT = 'Use NxN, Pot, or N" Pot (e.g. 8x10, Pot, 12" Pot)'
+const DIMENSION_PATTERN = /^(?:\d+\s*[xX]\s*\d+|pot|\d+"\s*pot)$/i
 
 export default function PlantsPage() {
   const [plants,   setPlants]   = useState([])
@@ -72,6 +74,7 @@ export default function PlantsPage() {
   }
   function addDimRow()    { setDimRows(p => [...p, newDimRow()]) }
   function removeDimRow(i){ setDimRows(p => p.filter((_, idx) => idx !== i)) }
+  function isValidDimensionFormat(value) { return DIMENSION_PATTERN.test(value.trim()) }
 
   // ── Validate create form ─────────────────────────────────
   function validateCreate() {
@@ -90,8 +93,8 @@ export default function PlantsPage() {
       if (hasDim || hasPrice) {
         if (!hasDim) {
           errs.dims[i].dimension = 'Required'; ok = false
-        } else if (!/^\d+\s*[xX]\s*\d+$/.test(r.dimension.trim())) {
-          errs.dims[i].dimension = 'Format: NxN (e.g. 8x10)'; ok = false
+        } else if (!isValidDimensionFormat(r.dimension)) {
+          errs.dims[i].dimension = DIMENSION_FORMAT_HINT; ok = false
         }
 
         if (!hasPrice || isNaN(parseFloat(r.price)) || parseFloat(r.price) < 0) {
@@ -142,8 +145,8 @@ export default function PlantsPage() {
     const errs = {}
     if (!addDim.trim()) {
       errs.dimension = 'Dimension label is required'
-    } else if (!/^\d+\s*[xX]\s*\d+$/.test(addDim.trim())) {
-      errs.dimension = 'Format: NxN (e.g. 8x10)'
+    } else if (!isValidDimensionFormat(addDim)) {
+      errs.dimension = DIMENSION_FORMAT_HINT
     }
 
     if (!addPrice || isNaN(parseFloat(addPrice)) || parseFloat(addPrice) < 0)
@@ -157,7 +160,7 @@ export default function PlantsPage() {
     setAddingSz(true)
     try {
       await plantService.addDimension(addSizeFor, addDim.trim(), parseFloat(addPrice) || 0)
-      toast.success('Bag size added')
+      toast.success('Size added')
       setAddSizeFor(null); setAddDim(''); setAddPrice(''); setAddSzErrs({})
       fetchPlants()
     } catch (err) {
@@ -304,7 +307,7 @@ export default function PlantsPage() {
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="block text-xs font-semibold text-muted tracking-wide">
-                Bag Sizes &amp; Prices
+                Sizes &amp; Prices
                 <span className="ml-1.5 text-[10px] font-normal text-gray-400">(optional — can add later)</span>
               </label>
               <button onClick={addDimRow}
@@ -368,7 +371,7 @@ export default function PlantsPage() {
       </Modal>
 
       {/* ── Add Size to Existing Plant Modal ──────────────── */}
-      <Modal open={!!addSizeFor} onClose={() => setAddSizeFor(null)} title="Add Bag Size"
+      <Modal open={!!addSizeFor} onClose={() => setAddSizeFor(null)} title="Add Size"
         footer={
           <div className="flex justify-end gap-2.5">
             <Button variant="secondary" onClick={() => setAddSizeFor(null)}>Cancel</Button>
@@ -400,10 +403,10 @@ export default function PlantsPage() {
 
       {/* ── Delete Confirm ───────────────────────────────── */}
       <ConfirmDialog open={!!deleteTarget} onClose={() => setDeleteTarget(null)} onConfirm={handleDelete}
-        title={deleteTarget?.type === 'plant' ? 'Delete Plant' : 'Remove Bag Size'}
+        title={deleteTarget?.type === 'plant' ? 'Delete Plant' : 'Remove Size'}
         description={deleteTarget?.type === 'plant'
           ? 'This will delete the plant and all its sizes permanently.'
-          : 'This bag size will be removed permanently.'}
+          : 'This size will be removed permanently.'}
         confirmLabel="Delete" danger />
     </div>
   )

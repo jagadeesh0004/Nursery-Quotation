@@ -1,4 +1,4 @@
-package com.nursery.controller;
+package com.nursery.common.controller;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;

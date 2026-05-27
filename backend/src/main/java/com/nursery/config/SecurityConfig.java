@@ -46,7 +46,7 @@ public class SecurityConfig {
                         // Note: context-path is /api, so these become /api/ping, /api/health, etc.
                         .requestMatchers("/ping", "/health" ,"/error").permitAll()
                         .requestMatchers("/public/**", "/sharing/**").permitAll()
-
+                        .requestMatchers("/auth/**").permitAll()
                         // ✅ Everything else requires auth
                         .anyRequest().authenticated()
                 )

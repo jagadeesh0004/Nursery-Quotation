@@ -8,26 +8,20 @@ import { Button, Input, Textarea, PageHeader, SectionCard } from '../components/
 import { getError } from '../utils'
 
 export default function SettingsPage() {
-  const { profile, user, fetchProfile, forceRefreshProfile, logout, profileLoaded } = useAuth()
+  const { profile, user, forceRefreshProfile, logout } = useAuth()
   const navigate = useNavigate()
 
-  const [ownerName, setOwnerName]     = useState('')
+  const [ownerName, setOwnerName] = useState('')
   const [nurseryName, setNurseryName] = useState('')
-  const [address, setAddress]         = useState('')
-  const [phone, setPhone]             = useState('')
-  const [saving, setSaving]           = useState(false)
-  const [errors, setErrors]           = useState({})
-  const [isEditing, setIsEditing]     = useState(false)
+  const [address, setAddress] = useState('')
+  const [phone, setPhone] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [errors, setErrors] = useState({})
+  const [isEditing, setIsEditing] = useState(false)
   const [logoUploading, setLogoUploading] = useState(false)
 
   const fileRef = useRef()
 
-  // ✅ Profile is already loaded by ProtectedRoute
-  // If you see this page, profileLoaded = true
-  // So we don't need a loading spinner here
-
-  // Single source of truth: profile from AuthContext.
-  // logoPreview is derived here — never set manually after an upload.
   const logoPreview =
     profile?.logoPath && profile.logoPath.startsWith('http')
       ? profile.logoPath
@@ -35,140 +29,110 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (!profile) return
-    console.log('📝 SettingsPage: Populating form with profile data:', profile.nurseryName)
-    setOwnerName(profile.ownerName   || '')
+    setOwnerName(profile.ownerName || '')
     setNurseryName(profile.nurseryName || '')
-    setAddress(profile.address       || '')
-    setPhone(profile.phone           || '')
+    setAddress(profile.address || '')
+    setPhone(profile.phone || '')
 
     if (!profile.nurseryName) {
-      console.log('📝 SettingsPage: Profile incomplete, enabling edit mode')
       setIsEditing(true)
     }
   }, [profile])
 
   function validate() {
     const errs = {}
-    if (!ownerName.trim())   errs.ownerName   = 'Owner name is required'
+    if (!ownerName.trim()) errs.ownerName = 'Owner name is required'
     if (!nurseryName.trim()) errs.nurseryName = 'Nursery name is required'
-    if (!address.trim())     errs.address     = 'Address is required'
-    if (!phone.trim())       errs.phone       = 'Phone number is required'
+    if (!address.trim()) errs.address = 'Address is required'
+    if (!phone.trim()) errs.phone = 'Phone number is required'
     setErrors(errs)
     return Object.keys(errs).length === 0
   }
 
-      async function handleSave(e) {
-        e.preventDefault()
-        if (!validate()) return
-        setSaving(true)
+  async function handleSave(e) {
+    e.preventDefault()
+    if (!validate()) return
+    setSaving(true)
+    try {
+      await profileService.update({
+        ownerName: ownerName.trim(),
+        nurseryName: nurseryName.trim(),
+        address: address.trim(),
+        phone: phone.trim(),
+        email: user?.email || '',
+      })
+
+      const updated = await forceRefreshProfile()
+      if (updated) {
+        toast.success('Profile saved!')
+        setIsEditing(false)
+        navigate('/dashboard', { replace: true })
+      } else {
+        toast.error('Profile saved but failed to reload. Please refresh the page.')
+      }
+    } catch (err) {
+      if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
+        toast.loading('Verifying save...')
         try {
-          console.log('💾 Saving profile with data:', {
-            ownerName: ownerName.trim(),
-            nurseryName: nurseryName.trim(),
-            address: address.trim(),
-            phone: phone.trim(),
-            email: user?.email || '',
-          })
-
-          // ✅ Backend extracts userId from auth token, so we don't send it
-          await profileService.update({
-            ownerName:   ownerName.trim(),
-            nurseryName: nurseryName.trim(),
-            address:     address.trim(),
-            phone:       phone.trim(),
-            email:       user?.email || '',
-          })
-
-          console.log('✅ Profile saved to backend')
-
-          // ✅ BUG FIX: Use forceRefreshProfile to bust cache and re-fetch after save
           const updated = await forceRefreshProfile()
           if (updated) {
+            toast.dismiss()
             toast.success('Profile saved!')
             setIsEditing(false)
-            // ✅ After saving profile, redirect to dashboard
-            console.log('📌 Profile saved successfully → redirecting to /dashboard')
             navigate('/dashboard', { replace: true })
-          } else {
-            // Profile fetch failed, show error
-            toast.error('Profile saved but failed to reload. Please refresh the page.')
+            return
           }
-        } catch (err) {
-          console.error('❌ Profile save error:', err)
-
-          // ✅ BUG FIX: Handle timeout gracefully
-          // Backend may have succeeded but frontend timed out waiting
-          if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
-            console.warn('⏱️ Request timeout - backend may have succeeded, verifying...')
-            toast.loading('Verifying save...')
-            try {
-              const updated = await forceRefreshProfile()
-              if (updated) {
-                toast.dismiss()
-                toast.success('Profile saved!')
-                setIsEditing(false)
-                console.log('📌 Profile verified and saved successfully → redirecting to /dashboard')
-                navigate('/dashboard', { replace: true })
-                return
-              }
-            } catch (e) {
-              console.error('❌ Failed to verify profile after timeout:', e)
-            }
-            toast.dismiss()
-          }
-
-          const message = getError(err)
-          if (message) {
-            // ✅ Show more detailed error for debugging
-            if (err.response?.status === 500) {
-              toast.error('Backend error: ' + (message || 'Internal server error'))
-            } else {
-              toast.error(message)
-            }
-          } else {
-            toast.error('Failed to save profile')
-          }
-        } finally {
-          setSaving(false)
+        } catch (verifyError) {
+          console.error('Failed to verify profile after timeout', verifyError)
         }
+        toast.dismiss()
       }
 
-    async function handleLogoChange(e) {
-      const file = e.target.files?.[0]
-      if (!file) return
-
-      if (!profile?.nurseryName) {
-        toast.error('Please fill and save your nursery name first before uploading a logo.')
-        return
+      const message = getError(err)
+      if (message) {
+        if (err.response?.status === 500) {
+          toast.error('Backend error: ' + (message || 'Internal server error'))
+        } else {
+          toast.error(message)
+        }
+      } else {
+        toast.error('Failed to save profile')
       }
-
-      setLogoUploading(true)
-      const loadingToast = toast.loading('Compressing and uploading...')
-
-       try {
-         // Upload to Supabase and save URL via PUT /profile in one call
-         const latestProfileReq = await profileService.get()
-         const latestProfile = latestProfileReq.data?.data || profile
-
-         // ✅ Pass userId from auth context to uploadLogo
-         await profileService.uploadLogo(file, latestProfile, user?.id)
-
-        // ✅ Refresh profile from backend — use forceRefreshProfile to bust cache
-        // logoPreview is derived from this, so the image will update automatically
-        await forceRefreshProfile()
-
-        toast.dismiss(loadingToast)
-        toast.success('Logo updated!')
-      } catch (err) {
-        toast.dismiss(loadingToast)
-        const message = getError(err)
-        if (message) toast.error(message)
-      } finally {
-        setLogoUploading(false)
-        // Reset so the same file can be selected again
-        if (fileRef.current) fileRef.current.value = ''
-      }
+    } finally {
+      setSaving(false)
     }
+  }
+
+  async function handleLogoChange(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (!profile?.nurseryName) {
+      toast.error('Please fill and save your nursery name first before uploading a logo.')
+      return
+    }
+
+    setLogoUploading(true)
+    const loadingToast = toast.loading('Compressing and uploading...')
+
+    try {
+      const latestProfileReq = await profileService.get()
+      const latestProfile = latestProfileReq.data?.data || profile
+
+      await profileService.uploadLogo(file, latestProfile, user?.id)
+      await forceRefreshProfile()
+
+      toast.dismiss(loadingToast)
+      toast.success('Logo updated!')
+    } catch (err) {
+      toast.dismiss(loadingToast)
+      const message = getError(err)
+      if (message) toast.error(message)
+    } finally {
+      setLogoUploading(false)
+      if (fileRef.current) fileRef.current.value = ''
+    }
+  }
 
   function handleLogout() {
     if (!window.confirm('Are you sure you want to sign out?')) return
@@ -179,10 +143,10 @@ export default function SettingsPage() {
 
   function handleCancelEdit() {
     setIsEditing(false)
-    setOwnerName(profile?.ownerName   || '')
+    setOwnerName(profile?.ownerName || '')
     setNurseryName(profile?.nurseryName || '')
-    setAddress(profile?.address       || '')
-    setPhone(profile?.phone           || '')
+    setAddress(profile?.address || '')
+    setPhone(profile?.phone || '')
     setErrors({})
   }
 
@@ -203,7 +167,6 @@ export default function SettingsPage() {
         )}
 
         <div className="flex items-center sm:items-start gap-6 flex-col sm:flex-row mb-6 pb-6 border-b border-gray-100">
-          {/* Logo circle */}
           <div className="relative flex-shrink-0">
             <div className="w-24 h-24 rounded-full border border-gray-200 bg-gray-50 flex items-center justify-center overflow-hidden shadow-sm">
               {logoPreview ? (
@@ -214,7 +177,7 @@ export default function SettingsPage() {
                   onError={(e) => { e.target.style.display = 'none' }}
                 />
               ) : (
-                <span className="text-3xl text-gray-300">●</span>
+                <span className="text-3xl text-gray-300">o</span>
               )}
             </div>
 
@@ -242,7 +205,6 @@ export default function SettingsPage() {
             />
           </div>
 
-          {/* Profile summary / change-logo link */}
           <div className="flex-1 mt-2 sm:mt-0 w-full flex flex-col items-center sm:items-start text-center sm:text-left">
             <p className="font-semibold text-ink text-lg">{nurseryName || 'Your Nursery'}</p>
             <p className="text-sm text-muted font-mono mt-1">{phone || 'No phone number'}</p>
@@ -300,7 +262,7 @@ export default function SettingsPage() {
             />
             <Textarea
               label="Business Address"
-              placeholder="Full address — appears on every quotation"
+              placeholder="Full address - appears on every quotation"
               required
               value={address}
               onChange={e => setAddress(e.target.value)}

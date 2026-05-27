@@ -90,19 +90,11 @@ export const quotationService = {
 
   delete: (id) => api.delete(`/quotations/${id}`),
 
-  getPdf: (id) =>
-    api.get(`/quotations/${id}/pdf`, {
-      responseType: 'blob',
-      timeout: 30000,
-    }),
-
   downloadPdf: (id) =>
     api.get(`/quotations/${id}/pdf`, {
       responseType: 'blob',
       timeout: 30000,
     }),
-
-  trackView: (token) => api.post(`/public/quotations/${token}/track-view`),
 }
 
 /**
@@ -110,12 +102,6 @@ export const quotationService = {
  */
 export const publicService = {
   getQuotation: (token) => api.get(`/public/quotations/${token}`),
-
-  getPdf: (token) =>
-    api.get(`/public/quotations/${token}/pdf`, {
-      responseType: 'blob',
-      timeout: 30000,
-    }),
 
   downloadPdf: (token) =>
     api.get(`/public/quotations/${token}/pdf`, {

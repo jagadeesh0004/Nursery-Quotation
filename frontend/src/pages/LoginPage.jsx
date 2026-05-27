@@ -1,5 +1,5 @@
 /**
- * LoginPage — Email/Password authentication via Supabase
+ * LoginPage - Email/Password authentication via Supabase
  */
 import { useEffect, useState } from 'react'
 import { Sprout, Eye, EyeOff } from 'lucide-react'
@@ -15,9 +15,8 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [showSignup, setShowSignup] = useState(false)
   const navigate = useNavigate()
-  const { isAuthenticated, login, refreshSession, fetchProfile, profile, loading: authLoading } = useAuth()
+  const { isAuthenticated, login, refreshSession, profile, loading: authLoading } = useAuth()
 
-  // Redirect if already logged in
   useEffect(() => {
     if (authLoading) return
     if (isAuthenticated) {
@@ -26,88 +25,64 @@ export default function LoginPage() {
     }
   }, [isAuthenticated, profile, authLoading, navigate])
 
-   // Handle email/password login
-   const handleLogin = async (e) => {
-     e.preventDefault()
-     if (!email || !password) {
-       toast.error('Please fill in all fields')
-       return
-     }
-
-      setLoading(true)
-      try {
-        console.log('🔐 Attempting login with:', email)
-        const result = await login(email, password)
-
-        console.log('📊 Login response:', {
-          success: result.success,
-          hasSession: !!result.session,
-          errorMsg: result.error?.message,
-          user: result.session?.user?.email,
-        })
-
-        if (!result.success) {
-          console.error('❌ Login error:', result.error)
-          toast.error(result.error?.message || 'Failed to sign in')
-        } else if (result.session) {
-          console.log('✅ Login successful:', email)
-          console.log('✅ Session token:', result.session.access_token?.substring(0, 20) + '...')
-
-          // ✅ BUG FIX: Don't wait for profile fetch - redirect immediately
-          // Profile will be fetched in background via fetchProfile in AuthContext
-          // This prevents timeout from blocking login for new accounts
-          toast.success('Signed in successfully')
-
-          // Redirect based on whether we have profile or not
-          // For new users, they'll see /settings and profile will load in background
-          // For returning users, they'll see /dashboard
-          const defaultTarget = profile ? '/dashboard' : '/settings'
-          console.log('📌 Login redirecting to:', defaultTarget)
-          navigate(defaultTarget, { replace: true })
-        } else {
-          await refreshSession()
-          console.warn('⚠️ Login response has no session or error:', result)
-          toast.error('Login failed: No session returned')
-        }
-      } catch (err) {
-        console.error('❌ Sign-in error:', err)
-        toast.error(err.message || 'An error occurred during sign-in')
-      } finally {
-        setLoading(false)
-      }
-   }
-
-  // Handle signup
-  const handleSignup = async (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault()
     if (!email || !password) {
       toast.error('Please fill in all fields')
       return
     }
 
+    setLoading(true)
+    try {
+      const result = await login(email, password)
+
+      if (!result.success) {
+        toast.error(result.error?.message || 'Failed to sign in')
+      } else if (result.session) {
+        toast.success('Signed in successfully')
+        const defaultTarget = profile ? '/dashboard' : '/settings'
+        navigate(defaultTarget, { replace: true })
+      } else {
+        await refreshSession()
+        toast.error('Login failed: No session returned')
+      }
+    } catch (err) {
+      toast.error(err.message || 'An error occurred during sign-in')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleSignup = async (e) => {
+    e.preventDefault()
+    if (!email || !password) {
+      toast.error('Please fill in all fields')
+      return
+    }
     if (password.length < 6) {
       toast.error('Password must be at least 6 characters')
       return
     }
-
     setLoading(true)
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
       })
-
       if (error) {
-        console.error('❌ Signup error:', error)
-        toast.error(error.message || 'Failed to sign up')
+        if (error.message && error.message.toLowerCase().includes('already registered')) {
+          toast.error('User already registered. Please log in.')
+          setShowSignup(false)
+          setPassword('')
+        } else {
+          toast.error(error.message || 'Failed to sign up')
+        }
       } else if (data?.user) {
-        console.log('✅ Signup successful:', email)
         toast.success('Account created! Please log in.')
         setShowSignup(false)
         setPassword('')
       }
     } catch (err) {
-      console.error('❌ Sign-up error:', err)
       toast.error(err.message || 'An error occurred during sign-up')
     } finally {
       setLoading(false)
@@ -145,6 +120,7 @@ export default function LoginPage() {
                   placeholder="your@email.com"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#5CB338] focus:border-transparent"
                   disabled={loading}
+                  autoComplete="username"
                 />
               </div>
 
@@ -155,7 +131,7 @@ export default function LoginPage() {
                     type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
+                    placeholder="********"
                     autoComplete={showSignup ? 'new-password' : 'current-password'}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#5CB338] focus:border-transparent pr-10"
                     disabled={loading}

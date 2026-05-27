@@ -6,10 +6,9 @@ export default function AuthCallbackPage() {
   const navigate = useNavigate()
 
   useEffect(() => {
-    console.log('Full URL:', window.location.href)
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('Callback event:', event, !!session)
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN' && session) {
         navigate('/dashboard', { replace: true })
       } else if (event === 'SIGNED_OUT') {
@@ -17,9 +16,7 @@ export default function AuthCallbackPage() {
       }
     })
 
-    // Fallback for already-resolved session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log('getSession result:', !!session)
       if (session) navigate('/dashboard', { replace: true })
     })
 

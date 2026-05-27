@@ -123,9 +123,9 @@ export default function DashboardPage() {
                   <tr key={q.id}
                     className="group hover:bg-green-50/50 transition-colors cursor-pointer animate-fade-up"
                     onClick={() => navigate(`/quotations/${q.id}`)}>
-                    <td className="px-3 sm:px-5 py-3 sm:py-4">
-                      <span className="font-mono text-xs text-muted bg-gray-100 px-2 py-0.5 rounded-md">{formatQuotationId(q.nurseryName || profile?.nurseryName, q.id)}</span>
-                    </td>
+                     <td className="px-3 sm:px-5 py-3 sm:py-4">
+                       <span className="font-mono text-xs text-muted bg-gray-100 px-2 py-0.5 rounded-md">{q.quotationNumber || '-'}</span>
+                     </td>
                     <td className="px-3 sm:px-5 py-3 sm:py-4">
                       <p className="text-sm font-semibold text-ink">{q.customerName || <span className="text-gray-400 italic text-xs font-normal">No name</span>}</p>
                       {q.customerPhone && <p className="text-xs text-muted font-mono mt-0.5">{q.customerPhone}</p>}

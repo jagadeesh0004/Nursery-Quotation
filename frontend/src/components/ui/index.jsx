@@ -3,6 +3,7 @@
  * Design-system primitives — Poppins font, green-800 primary, green-100 backgrounds.
  */
 import { forwardRef } from 'react'
+import { createPortal } from 'react-dom'
 import { X, AlertTriangle } from 'lucide-react'
 import { cx } from '../../utils'
 
@@ -148,7 +149,7 @@ export function EmptyState({ icon: Icon, title, description, action }) {
 // ── Modal ────────────────────────────────────────────────────
 export function Modal({ open, onClose, title, children, footer, width = 'max-w-md' }) {
   if (!open) return null
-  return (
+  const modalContent = (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
       <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px] animate-fade-in" onClick={onClose} />
       <div className={cx('relative bg-white rounded-2xl shadow-lg w-full animate-scale-in', width)}>
@@ -163,6 +164,7 @@ export function Modal({ open, onClose, title, children, footer, width = 'max-w-m
       </div>
     </div>
   )
+  return createPortal(modalContent, document.body)
 }
 
 // ── ConfirmDialog ────────────────────────────────────────────
@@ -201,7 +203,7 @@ export function PageHeader({ title, subtitle, action }) {
 }
 
 // ── SearchBar ────────────────────────────────────────────────
-export function SearchBar({ value, onChange, placeholder = 'Search…', className }) {
+export function SearchBar({ value, onChange, placeholder = 'Search...', className }) {
   return (
     <div className={cx('relative', className)}>
       <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">

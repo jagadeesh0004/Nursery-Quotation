@@ -10,6 +10,10 @@ import org.mapstruct.Mapping;
 public interface QuotationMapper {
 
     @Mapping(target = "items", source = "items")
+    @Mapping(target = "nurseryName", ignore = true)
+    @Mapping(target = "nurseryAddress", ignore = true)
+    @Mapping(target = "nurseryPhone", ignore = true)
+    @Mapping(target = "nurseryOwnerName", ignore = true)
     QuotationResponse toResponse(Quotation quotation);
 
     QuotationSummaryResponse toSummaryResponse(Quotation quotation);
