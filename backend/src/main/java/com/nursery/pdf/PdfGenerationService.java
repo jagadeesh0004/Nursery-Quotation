@@ -258,7 +258,10 @@ public class PdfGenerationService {
         sb.append("<tr>");
         sb.append("<td width=\"35%\" valign=\"bottom\">");
         sb.append("<div style=\"font-size:12px; font-weight:bold; color:#333333; margin-bottom:8px;\">Notes:</div>");
-        sb.append("<div style=\"border:1px solid #eeeeee; background:#fafbfc; border-radius:4px; height:90px;\"></div>");
+        String notesText = e(quotation.getNotes());
+        sb.append("<div style=\"border:1px solid #dddddd; background:#fafbfc; border-radius:4px; height:90px; padding:8px; white-space:pre-wrap; font-size:12px; color:#333;\">");
+        sb.append(notesText);
+        sb.append("</div>");
         sb.append("</td>");
         sb.append("<td width=\"30%\"></td>");
         sb.append("<td width=\"35%\" valign=\"bottom\" align=\"right\">");
