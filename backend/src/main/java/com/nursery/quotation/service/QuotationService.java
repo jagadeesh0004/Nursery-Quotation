@@ -58,6 +58,7 @@ public class QuotationService {
                 .customerName(request.customerName())
                 .customerPhone(request.customerPhone())
                 .customerAddress(request.customerAddress())
+            .notes(request.notes())
                 .year(Year.now().getValue())
                 .build();
 
@@ -121,6 +122,7 @@ public class QuotationService {
         quotation.setCustomerName(request.customerName());
         quotation.setCustomerPhone(request.customerPhone());
         quotation.setCustomerAddress(request.customerAddress());
+        quotation.setNotes(request.notes());
 
         if (request.items() != null) {
             quotation.getItems().clear();
@@ -159,6 +161,7 @@ public class QuotationService {
         if (request.customerName() != null)    quotation.setCustomerName(request.customerName());
         if (request.customerPhone() != null)   quotation.setCustomerPhone(request.customerPhone());
         if (request.customerAddress() != null) quotation.setCustomerAddress(request.customerAddress());
+        if (request.notes() != null)           quotation.setNotes(request.notes());
 
         if (request.items() != null && !request.items().isEmpty()) {
             quotation.getItems().clear();
@@ -197,6 +200,7 @@ public class QuotationService {
                 .customerName(source.getCustomerName())
                 .customerPhone(source.getCustomerPhone())
                 .customerAddress(source.getCustomerAddress())
+            .notes(source.getNotes())
                 .year(Year.now().getValue())
                 .totalAmount(source.getTotalAmount())
                 .build();
@@ -321,6 +325,7 @@ public class QuotationService {
                 baseResponse.customerName(),
                 baseResponse.customerPhone(),
                 baseResponse.customerAddress(),
+                baseResponse.notes(),
                 profile != null ? profile.getNurseryName() : null,
                 profile != null ? profile.getAddress() : null,
                 profile != null ? profile.getPhone() : null,

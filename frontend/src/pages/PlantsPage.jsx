@@ -23,8 +23,8 @@ import { formatCurrency, getError, cx } from '../utils'
 
 // ── Blank dimension row template ─────────────────────────────
 const newDimRow = () => ({ dimension: '', price: '' })
-const DIMENSION_FORMAT_HINT = 'Use NxN, Pot, or N" Pot (e.g. 8x10, Pot, 12" Pot)'
-const DIMENSION_PATTERN = /^(?:\d+\s*[xX]\s*\d+|pot|\d+"\s*pot)$/i
+const DIMENSION_FORMAT_HINT = 'Use NxN, kg/kgs, Pot, or N" Pot (e.g. 8x10, 10 kgs, Pot, 12" Pot)'
+const DIMENSION_PATTERN = /^(?:\d+\s*[xX]\s*\d+|\d+\s*kg(?:s)?|pot|\d+"\s*pot)$/i
 
 export default function PlantsPage() {
   const [plants,   setPlants]   = useState([])
@@ -308,7 +308,7 @@ export default function PlantsPage() {
             <div className="flex items-center justify-between mb-2">
               <label className="block text-xs font-semibold text-muted tracking-wide">
                 Sizes &amp; Prices
-                <span className="ml-1.5 text-[10px] font-normal text-gray-400">(optional — can add later)</span>
+                <span className="ml-1.5 text-[10px] font-normal text-gray-400">(use 8x10, 10 kgs, Pot, or 12&quot; Pot)</span>
               </label>
               <button onClick={addDimRow}
                 className="text-xs text-green-700 hover:text-[#4d962e] font-semibold flex items-center gap-1 hover:underline">
@@ -323,7 +323,7 @@ export default function PlantsPage() {
                   <div className="flex-1">
                     <input
                       type="text"
-                      placeholder="e.g. Small (5×7)"
+                      placeholder="e.g. 5x5, 10 kgs, 12&quot; Pot"
                       value={row.dimension}
                       onChange={e => updateDimRow(i, 'dimension', e.target.value)}
                       className={cx('field text-sm', createErrs.dims?.[i]?.dimension && 'field-error')}
@@ -382,7 +382,7 @@ export default function PlantsPage() {
         }
       >
         <div className="space-y-4">
-          <Input label="Bag Size / Dimension" placeholder="e.g. Medium (8×10)" required
+          <Input label="Bag Size / Dimension" placeholder="e.g. 8x10, 10 kgs, 12&quot; Pot" required
             value={addDim} onChange={e => setAddDim(e.target.value)}
             error={addSzErrs.dimension} autoFocus />
           <div>

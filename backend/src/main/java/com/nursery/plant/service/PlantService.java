@@ -403,6 +403,10 @@ public class PlantService {
         if (trimmed.matches("^\\d+\\s*[xX]\\s*\\d+$")) {
             return trimmed.replaceAll("\\s*[xX]\\s*", "x").toLowerCase();
         }
+        // For weight sizes (number kg / kgs): normalize to a single lowercase canonical form
+        if (trimmed.matches("^\\d+\\s*[Kk][Gg](s)?$")) {
+            return trimmed.replaceAll("\\s*[Kk][Gg](s)?$", " kgs").toLowerCase();
+        }
         // For plain pot dimensions: normalize case
         if (trimmed.equalsIgnoreCase("pot")) {
             return "pot";
@@ -416,7 +420,7 @@ public class PlantService {
     }
 
     private boolean isSupportedDimensionFormat(String dimension) {
-        return dimension.matches("(^\\d+x\\d+$)|(^pot$)|(^\\d+\"\\s*pot$)");
+        return dimension.matches("(^\\d+x\\d+$)|(^pot$)|(^\\d+\"\\s*pot$)|(^\\d+\\s*kgs?$)");
     }
 
     /**

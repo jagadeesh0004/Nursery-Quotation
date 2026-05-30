@@ -19,8 +19,8 @@ public class QuotationDtos {
 
              @NotBlank(message = "Dimension is required")
              @Pattern(
-                 regexp = "(^\\d+\\s*[xX]\\s*\\d+$)|(^[Pp]ot$)|(^\\d+\"\\s*[Pp]ot$)",
-                 message = "Dimension must be a bag size (number x number) or a pot size (pot or number\" pot, e.g., 12\" pot)"
+                                 regexp = "(^\\d+\\s*[xX]\\s*\\d+$)|(^[Pp]ot$)|(^\\d+\"\\s*[Pp]ot$)|(^\\d+\\s*[Kk][Gg](s)?$)",
+                                 message = "Dimension must be a bag size (number x number), a weight size (number kg/kgs), or a pot size (pot or number\" pot)"
              )
              @Size(max = 20)
              String dimension,
@@ -39,6 +39,7 @@ public class QuotationDtos {
             String customerName,
             String customerPhone,
             String customerAddress,
+            String notes,
 
             @Valid
             List<QuotationItemRequest> items,
@@ -51,6 +52,7 @@ public class QuotationDtos {
             String customerName,
             String customerPhone,
             String customerAddress,
+            String notes,
 
             @Valid
             List<QuotationItemRequest> items,
@@ -76,6 +78,7 @@ public class QuotationDtos {
             String customerName,
             String customerPhone,
             String customerAddress,
+            String notes,
             String nurseryName,
             String nurseryAddress,
             String nurseryPhone,

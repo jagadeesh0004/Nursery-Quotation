@@ -11,9 +11,9 @@ import { ArrowLeft, Plus, Trash2, Calculator, Save, CheckCheck, AlertTriangle } 
 import toast from 'react-hot-toast'
 import { quotationService, plantService } from '../services'
 import { Button, Input, Textarea, Spinner, SectionCard } from '../components/ui'
-import { formatCurrency, getError, cx } from '../utils'
+import { formatCurrency, formatNumber, getError, cx } from '../utils'
 
-const newItem = () => ({ plantName: '', dimension: '', quantity: 1, price: '' })
+const newItem = () => ({ plantName: '', dimension: '', quantity: '', price: '' })
 
 export default function QuotationFormPage() {
   const { id }   = useParams()
@@ -24,6 +24,7 @@ export default function QuotationFormPage() {
   const [customerName,    setCustomerName]    = useState('')
   const [customerPhone,   setCustomerPhone]   = useState('')
   const [customerAddress, setCustomerAddress] = useState('')
+  const [notes,           setNotes]           = useState('')
   const [items,           setItems]           = useState([newItem()])
   const [pageLoading,     setPageLoading]     = useState(isEdit)
   const [saving,          setSaving]          = useState(false)
@@ -48,9 +49,10 @@ export default function QuotationFormPage() {
       setCustomerName(q.customerName || '')
       setCustomerPhone(q.customerPhone || '')
       setCustomerAddress(q.customerAddress || '')
+      setNotes(q.notes || '')
       setItems(q.items?.length ? q.items.map(i => ({
         plantName: i.plantName || '', dimension: i.dimension || '',
-        quantity: i.quantity || 1, price: i.price ?? '',
+        quantity: i.quantity ?? 0, price: i.price ?? '',
       })) : [newItem()])
     }).catch((err) => {
       const message = getError(err)
@@ -64,6 +66,7 @@ export default function QuotationFormPage() {
   }
 
   function updateItem(index, field, value) {
+    if (field === 'quantity') value = value === '' ? '' : Number(value)
     setItems(prev => {
       const next = [...prev]
       next[index] = { ...next[index], [field]: value }
@@ -87,30 +90,17 @@ export default function QuotationFormPage() {
 
   function validate(shouldFinalize) {
     const errs = {}
-
-    if (shouldFinalize && !customerName.trim()) {
-      errs.customerName = 'Customer name is required'
-    }
-
-    if (shouldFinalize && !customerPhone.trim()) {
-      errs.customerPhone = 'Phone number is required to finalize'
-    }
-
-    if (shouldFinalize && !customerAddress.trim()) {
-      errs.customerAddress = 'Address is required to finalize'
-    }
-
+    if (shouldFinalize && !customerName.trim()) errs.customerName = 'Customer name is required'
+    if (shouldFinalize && !customerPhone.trim()) errs.customerPhone = 'Phone number is required to finalize'
+    if (shouldFinalize && !customerAddress.trim()) errs.customerAddress = 'Address is required to finalize'
     const validItems = items.filter(it => it.plantName)
     if (validItems.length === 0) errs.items = 'Add at least one plant item to save the quotation'
-
-    // Validate price fields — must not be empty on any filled row
     items.forEach((it, i) => {
       if (it.plantName && (it.price === '' || it.price === null || it.price === undefined)) {
         if (!errs.itemRows) errs.itemRows = {}
         errs.itemRows[i] = 'Price is required'
       }
     })
-
     setErrors(errs)
     return errs
   }
@@ -133,10 +123,11 @@ export default function QuotationFormPage() {
         customerName:    customerName.trim()    || undefined,
         customerPhone:   customerPhone.trim()   || undefined,
         customerAddress: customerAddress.trim() || undefined,
+        notes:           notes.trim()           || undefined,
         items: items.filter(it => it.plantName).map(it => ({
           plantName: it.plantName,
           dimension: it.dimension,
-          quantity:  parseInt(it.quantity) || 1,
+          quantity:  parseInt(it.quantity) || 0,
           price:     parseFloat(it.price)  || 0,
         })),
         shouldFinalize,
@@ -200,6 +191,8 @@ export default function QuotationFormPage() {
     </div>
   )
 
+  const desktopCols = '3.25fr 2.25fr 1.75fr 2fr 2fr 1fr'
+
   return (
     <div className="animate-fade-up max-w-3xl">
       {/* Header */}
@@ -226,6 +219,8 @@ export default function QuotationFormPage() {
         <Textarea label="Address" placeholder="Shipping / delivery address"
           value={customerAddress} onChange={e => setCustomerAddress(e.target.value)} rows={2}
           error={errors.customerAddress} />
+        <Textarea label="Notes" placeholder="Add any special instructions or remarks"
+          value={notes} onChange={e => setNotes(e.target.value)} rows={3} />
       </SectionCard>
 
       {/* Items */}
@@ -236,15 +231,18 @@ export default function QuotationFormPage() {
           </div>
         )}
 
-        {/* Column headers */}
-        <div className="hidden sm:grid grid-cols-12 gap-3 mb-2 px-1">
+        {/* ── Column headers (desktop only) ── */}
+        <div
+          className="hidden sm:grid gap-3 mb-2 px-1"
+          style={{ gridTemplateColumns: desktopCols }}
+        >
           {[
-            ['Plant Name','col-span-4'],
-            ['Bag / Pot Size','col-span-3'],
-            ['Qty','col-span-1'],
-            ['Price / Pc','col-span-2'],
-            ['Total','col-span-1 text-right'],
-            ['','col-span-1']
+            ['Plant Name', ''],
+            ['Bag Size / Dimension', ''],
+            ['Qty', 'text-center'],
+            ['Rate', ''],
+            ['Total', 'text-right'],
+            ['', ''],
           ].map(([h, cls]) => (
             <span key={h} className={cx('text-[11px] font-semibold text-muted uppercase tracking-wide', cls)}>{h}</span>
           ))}
@@ -252,126 +250,94 @@ export default function QuotationFormPage() {
 
         <div className="space-y-4 sm:space-y-3">
           {items.map((item, idx) => {
-            const existingPlant = plants.find(p => p.name.toLowerCase() === (item.plantName || '').toLowerCase());
-            const isCustomPlant = item.plantName && !existingPlant;
-            const isNewDimension = existingPlant && item.dimension && !getDimensions(item.plantName).some(d => (d.dimension || d.label)?.toLowerCase() === item.dimension.toLowerCase());
+            const existingPlant    = plants.find(p => p.name.toLowerCase() === (item.plantName || '').toLowerCase())
+            const isCustomPlant    = item.plantName && !existingPlant
+            const isNewDimension   = existingPlant && item.dimension && !getDimensions(item.plantName).some(d => (d.dimension || d.label)?.toLowerCase() === item.dimension.toLowerCase())
 
-            // Filter plants for custom dropdown
-            const searchLower = (item.plantName || '').toLowerCase()
-            const filteredPlants = activeSearch === idx
-              ? plants.filter(p => p.name.toLowerCase().includes(searchLower))
-              : []
+            const searchLower      = (item.plantName || '').toLowerCase()
+            const filteredPlants   = activeSearch === idx ? plants.filter(p => p.name.toLowerCase().includes(searchLower)) : []
 
-            // Filter dimensions for custom dropdown
-            const dimSearchLower = (item.dimension || '').toLowerCase()
+            const dimSearchLower   = (item.dimension || '').toLowerCase()
             const knownDimsForPlant = getDimensions(item.plantName).map(d => d.dimension || d.label)
-
             let filteredDims = []
             if (activeDimSearch === idx) {
-              if (dimSearchLower) {
-                filteredDims = allUniqueDimensions.filter(d => d.toLowerCase().includes(dimSearchLower))
-              } else {
-                filteredDims = knownDimsForPlant.length > 0 ? knownDimsForPlant : allUniqueDimensions.slice(0, 10)
-              }
+              filteredDims = dimSearchLower
+                ? allUniqueDimensions.filter(d => d.toLowerCase().includes(dimSearchLower))
+                : knownDimsForPlant.length > 0 ? knownDimsForPlant : allUniqueDimensions.slice(0, 10)
             }
 
             return (
-              <div key={idx} className="flex flex-col gap-2 transition-colors">
-                <div className={cx(
-                  'grid grid-cols-12 gap-x-2 gap-y-3 sm:gap-3 items-start p-3.5 sm:p-0 rounded-xl sm:rounded-none',
-                  errors.itemRows?.[idx] ? 'bg-red-50 border border-red-200 sm:border-transparent sm:bg-transparent' : 'bg-gray-50 sm:bg-transparent border border-gray-100 sm:border-transparent'
-                )}>
+              <div key={idx} className="transition-colors">
+
+                {/* ── Desktop row (fr grid) ── */}
+                <div
+                  className={cx(
+                    'hidden sm:grid gap-3 items-start',
+                    errors.itemRows?.[idx] ? 'bg-red-50/40 rounded-xl px-2 py-1' : ''
+                  )}
+                  style={{ gridTemplateColumns: desktopCols }}
+                >
                   {/* Plant */}
-                  <div className="col-span-12 sm:col-span-4 flex flex-col relative">
-                    <label className="sm:hidden block text-[10px] font-semibold text-muted uppercase mb-1.5 whitespace-nowrap">Plant Name</label>
+                  <div className="flex flex-col relative">
                     <input
                       autoComplete="off"
                       value={item.plantName}
-                      onChange={e => {
-                        updateItem(idx, 'plantName', e.target.value)
-                        setActiveSearch(idx)
-                      }}
+                      onChange={e => { updateItem(idx, 'plantName', e.target.value); setActiveSearch(idx) }}
                       onFocus={() => setActiveSearch(idx)}
                       onBlur={() => setTimeout(() => setActiveSearch(null), 200)}
                       placeholder="Search or type plant"
                       className="field bg-white w-full text-sm"
                     />
-
-                    {/* Custom Dropdown */}
                     {activeSearch === idx && filteredPlants.length > 0 && (
                       <div className="absolute top-full left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-xl shadow-lg z-50 py-1">
                         {filteredPlants.map(p => (
-                          <div
-                            key={p.id}
-                            className="px-3 py-2 text-sm hover:bg-green-50 cursor-pointer text-gray-700"
-                            onClick={() => {
-                              updateItem(idx, 'plantName', p.name)
-                              setActiveSearch(null)
-                            }}
-                          >
+                          <div key={p.id} className="px-3 py-2 text-sm hover:bg-green-50 cursor-pointer text-gray-700"
+                            onClick={() => { updateItem(idx, 'plantName', p.name); setActiveSearch(null) }}>
                             {p.name}
                           </div>
                         ))}
                       </div>
                     )}
-
                     {isCustomPlant && activeSearch !== idx && (
                       <div className="mt-2 flex flex-col gap-1.5 items-start animate-fade-in">
                         <p className="text-[10px] text-amber-600 font-medium bg-amber-50 px-1.5 py-0.5 rounded border border-amber-100 inline-block w-fit">
                           New Plant detected. You can add it to master.
                         </p>
-                        <button
-                          onClick={() => handleQuickAddPlant(idx)}
-                          className="text-[11px] bg-green-50 text-green-700 hover:bg-green-100 px-2.5 py-1.5 rounded-lg border border-green-200 transition-colors flex items-center gap-1 font-medium shadow-sm w-fit"
-                        >
+                        <button onClick={() => handleQuickAddPlant(idx)}
+                          className="text-[11px] bg-green-50 text-green-700 hover:bg-green-100 px-2.5 py-1.5 rounded-lg border border-green-200 transition-colors flex items-center gap-1 font-medium shadow-sm w-fit">
                           <Plus className="w-3 h-3" /> Add "{item.plantName}" to Master
                         </button>
                       </div>
                     )}
                   </div>
 
-                  {/* Dimension */}
-                  <div className="col-span-6 sm:col-span-3 flex flex-col relative">
-                    <label className="sm:hidden block text-[10px] font-semibold text-muted uppercase mb-1.5 whitespace-nowrap">Bag / Pot Size</label>
-                    <input type="text"
-                      autoComplete="off"
+                  {/* Size */}
+                  <div className="flex flex-col relative">
+                    <input type="text" autoComplete="off"
                       value={item.dimension}
-                      onChange={e => {
-                        updateItem(idx, 'dimension', e.target.value)
-                        setActiveDimSearch(idx)
-                      }}
+                      onChange={e => { updateItem(idx, 'dimension', e.target.value); setActiveDimSearch(idx) }}
                       onFocus={() => setActiveDimSearch(idx)}
                       onBlur={() => setTimeout(() => setActiveDimSearch(null), 200)}
-                       placeholder='Size (e.g. 5x5, pot, or 12" Pot)'
-                      className="field bg-white w-full text-sm" />
-
-                    {/* Custom Dropdown for Dimensions */}
+                      placeholder='5x5, 10 kgs, Pot'
+                      className="field bg-white w-full text-sm"
+                    />
                     {activeDimSearch === idx && filteredDims.length > 0 && (
                       <div className="absolute top-full left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-xl shadow-lg z-50 py-1">
                         {filteredDims.map(d => (
-                          <div
-                            key={d}
-                            className="px-3 py-2 text-sm hover:bg-green-50 cursor-pointer text-gray-700"
-                            onClick={() => {
-                              updateItem(idx, 'dimension', d)
-                              setActiveDimSearch(null)
-                            }}
-                          >
+                          <div key={d} className="px-3 py-2 text-sm hover:bg-green-50 cursor-pointer text-gray-700"
+                            onClick={() => { updateItem(idx, 'dimension', d); setActiveDimSearch(null) }}>
                             {d}
                           </div>
                         ))}
                       </div>
                     )}
-
                     {isNewDimension && activeDimSearch !== idx && (
                       <div className="mt-2 flex flex-col gap-1.5 items-start animate-fade-in">
                         <p className="text-[10px] text-blue-600 font-medium bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100 inline-block w-fit">
                           New Size detected.
                         </p>
-                        <button
-                          onClick={() => handleQuickAddDimension(idx)}
-                          className="text-[11px] bg-blue-50 text-blue-700 hover:bg-blue-100 px-2.5 py-1.5 rounded-lg border border-blue-200 transition-colors flex items-center gap-1 font-medium shadow-sm w-fit text-left leading-tight"
-                        >
+                        <button onClick={() => handleQuickAddDimension(idx)}
+                          className="text-[11px] bg-blue-50 text-blue-700 hover:bg-blue-100 px-2.5 py-1.5 rounded-lg border border-blue-200 transition-colors flex items-center gap-1 font-medium shadow-sm w-fit text-left leading-tight">
                           <Plus className="w-3 h-3 flex-shrink-0" /> Add "{item.dimension}" size
                         </button>
                       </div>
@@ -379,50 +345,166 @@ export default function QuotationFormPage() {
                   </div>
 
                   {/* Qty */}
-                  <div className="col-span-4 sm:col-span-1 flex flex-col">
-                    <label className="sm:hidden block text-[10px] font-semibold text-muted uppercase text-center mb-1.5 whitespace-nowrap">Qty</label>
-                    <input type="number" min="1" placeholder="1"
-                      value={item.quantity} onChange={e => updateItem(idx, 'quantity', e.target.value)}
-                      className="field w-full text-sm text-center font-mono bg-white" />
+                  <div className="flex flex-col">
+                    <input type="number" min="0" placeholder="0"
+                      value={item.quantity}
+                      onChange={e => updateItem(idx, 'quantity', e.target.value)}
+                      className="field w-full text-sm text-center font-mono bg-white"
+                    />
                   </div>
 
-                  {/* Price — required number with visible validation */}
-                  <div className="col-span-6 sm:col-span-2 flex flex-col">
-                    <label className="sm:hidden block text-[10px] font-semibold text-muted uppercase mb-1.5 whitespace-nowrap">Price/Pc</label>
+                  {/* Rate */}
+                  <div className="flex flex-col">
                     <div className="relative">
                       <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[11px] text-muted font-semibold pointer-events-none">Rs</span>
                       <input type="number" min="0" step="0.01" placeholder="0"
                         value={item.price}
                         onChange={e => updateItem(idx, 'price', e.target.value)}
                         className={cx('field w-full text-sm font-mono pl-7 bg-white',
-                          errors.itemRows?.[idx] && 'field-error border-red-400')} />
+                          errors.itemRows?.[idx] && 'field-error border-red-400')}
+                      />
                     </div>
-                    {errors.itemRows?.[idx] && <p className="text-[10px] text-red-500 mt-1 max-w-full truncate">{errors.itemRows[idx]}</p>}
+                    {errors.itemRows?.[idx] && (
+                      <p className="text-[10px] text-red-500 mt-1 truncate">{errors.itemRows[idx]}</p>
+                    )}
                   </div>
 
                   {/* Row total */}
-                  <div className="col-span-5 sm:col-span-1 flex flex-col sm:items-end justify-start h-full">
-                    <label className="sm:hidden block text-[10px] font-semibold text-muted uppercase mb-1.5 whitespace-nowrap">Total</label>
+                  <div className="flex items-center justify-end h-full">
                     <span className="text-sm font-bold text-[#5CB338] font-mono truncate mt-2">
-                      {formatCurrency((parseFloat(item.price) || 0) * (parseInt(item.quantity) || 0))}
+                      {formatNumber((parseFloat(item.price) || 0) * (parseInt(item.quantity) || 0))}
                     </span>
                   </div>
 
-                  {/* Delete row */}
-                  <div className="col-span-3 sm:col-span-1 flex flex-col items-end sm:items-center justify-start h-full">
-                    <label className="sm:hidden block text-[10px] text-transparent uppercase mb-1.5 whitespace-nowrap select-none">Del</label>
+                  {/* Delete */}
+                  <div className="flex items-center justify-center h-full">
                     {items.length > 1 ? (
                       <button onClick={() => removeItem(idx)}
-                        className="w-10 h-10 sm:w-10 sm:h-10 rounded-xl sm:rounded-lg hover:bg-red-100 text-red-500 bg-white sm:bg-transparent border border-red-100 sm:border-transparent hover:text-red-700 flex items-center justify-center transition-colors shadow-sm sm:shadow-none">
+                        className="w-10 h-10 rounded-lg hover:bg-red-100 text-red-500 hover:text-red-700 flex items-center justify-center transition-colors">
                         <Trash2 className="w-4 h-4" />
                       </button>
-                    ) : (
-                      <div className="w-10 h-10 sm:w-10 sm:h-10"></div>
-                    )}
+                    ) : <div className="w-10 h-10" />}
                   </div>
                 </div>
-               </div>
-            )})}
+
+                {/* ── Mobile row (original 12-col grid) ── */}
+                <div className={cx(
+                  'sm:hidden grid grid-cols-12 gap-x-2 gap-y-3 items-start p-3.5 rounded-xl',
+                  errors.itemRows?.[idx] ? 'bg-red-50 border border-red-200' : 'bg-gray-50 border border-gray-100'
+                )}>
+                  {/* Plant */}
+                  <div className="col-span-12 flex flex-col relative">
+                    <label className="block text-[10px] font-semibold text-muted uppercase mb-1.5">Plant Name</label>
+                    <input autoComplete="off" value={item.plantName}
+                      onChange={e => { updateItem(idx, 'plantName', e.target.value); setActiveSearch(idx) }}
+                      onFocus={() => setActiveSearch(idx)}
+                      onBlur={() => setTimeout(() => setActiveSearch(null), 200)}
+                      placeholder="Search or type plant"
+                      className="field bg-white w-full text-sm"
+                    />
+                    {activeSearch === idx && filteredPlants.length > 0 && (
+                      <div className="absolute top-full left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-xl shadow-lg z-50 py-1">
+                        {filteredPlants.map(p => (
+                          <div key={p.id} className="px-3 py-2 text-sm hover:bg-green-50 cursor-pointer text-gray-700"
+                            onClick={() => { updateItem(idx, 'plantName', p.name); setActiveSearch(null) }}>
+                            {p.name}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {isCustomPlant && activeSearch !== idx && (
+                      <div className="mt-2 flex flex-col gap-1.5 items-start animate-fade-in">
+                        <p className="text-[10px] text-amber-600 font-medium bg-amber-50 px-1.5 py-0.5 rounded border border-amber-100 inline-block w-fit">
+                          New Plant detected. You can add it to master.
+                        </p>
+                        <button onClick={() => handleQuickAddPlant(idx)}
+                          className="text-[11px] bg-green-50 text-green-700 hover:bg-green-100 px-2.5 py-1.5 rounded-lg border border-green-200 transition-colors flex items-center gap-1 font-medium shadow-sm w-fit">
+                          <Plus className="w-3 h-3" /> Add "{item.plantName}" to Master
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Size */}
+                  <div className="col-span-7 flex flex-col relative">
+                    <label className="block text-[10px] font-semibold text-muted uppercase mb-1.5">Bag Size / Dimension</label>
+                    <input type="text" autoComplete="off" value={item.dimension}
+                      onChange={e => { updateItem(idx, 'dimension', e.target.value); setActiveDimSearch(idx) }}
+                      onFocus={() => setActiveDimSearch(idx)}
+                      onBlur={() => setTimeout(() => setActiveDimSearch(null), 200)}
+                      placeholder='e.g. 5x5, 10 kgs, 12" Pot'
+                      className="field bg-white w-full text-sm"
+                    />
+                    {activeDimSearch === idx && filteredDims.length > 0 && (
+                      <div className="absolute top-full left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-xl shadow-lg z-50 py-1">
+                        {filteredDims.map(d => (
+                          <div key={d} className="px-3 py-2 text-sm hover:bg-green-50 cursor-pointer text-gray-700"
+                            onClick={() => { updateItem(idx, 'dimension', d); setActiveDimSearch(null) }}>
+                            {d}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {isNewDimension && activeDimSearch !== idx && (
+                      <div className="mt-2 flex flex-col gap-1.5 items-start animate-fade-in">
+                        <p className="text-[10px] text-blue-600 font-medium bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100 inline-block w-fit">
+                          New Size detected.
+                        </p>
+                        <button onClick={() => handleQuickAddDimension(idx)}
+                          className="text-[11px] bg-blue-50 text-blue-700 hover:bg-blue-100 px-2.5 py-1.5 rounded-lg border border-blue-200 transition-colors flex items-center gap-1 font-medium shadow-sm w-fit text-left leading-tight">
+                          <Plus className="w-3 h-3 flex-shrink-0" /> Add "{item.dimension}" size
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Qty */}
+                  <div className="col-span-5 flex flex-col">
+                    <label className="block text-[10px] font-semibold text-muted uppercase mb-1.5 text-center">Qty</label>
+                    <input type="number" min="0" placeholder="0"
+                      value={item.quantity}
+                      onChange={e => updateItem(idx, 'quantity', e.target.value)}
+                      className="field w-full text-sm text-center font-mono bg-white"
+                    />
+                  </div>
+
+                  {/* Rate */}
+                  <div className="col-span-6 flex flex-col">
+                    <label className="block text-[10px] font-semibold text-muted uppercase mb-1.5">Rate</label>
+                    <div className="relative">
+                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[11px] text-muted font-semibold pointer-events-none">Rs</span>
+                      <input type="number" min="0" step="0.01" placeholder="0"
+                        value={item.price}
+                        onChange={e => updateItem(idx, 'price', e.target.value)}
+                        className={cx('field w-full text-sm font-mono pl-7 bg-white',
+                          errors.itemRows?.[idx] && 'field-error border-red-400')}
+                      />
+                    </div>
+                    {errors.itemRows?.[idx] && <p className="text-[10px] text-red-500 mt-1 truncate">{errors.itemRows[idx]}</p>}
+                  </div>
+
+                  {/* Total */}
+                  <div className="col-span-4 flex flex-col">
+                    <label className="block text-[10px] font-semibold text-muted uppercase mb-1.5">Total</label>
+                    <span className="text-sm font-bold text-[#5CB338] font-mono truncate mt-2">
+                      {formatNumber((parseFloat(item.price) || 0) * (parseInt(item.quantity) || 0))}
+                    </span>
+                  </div>
+
+                  {/* Delete */}
+                  <div className="col-span-2 flex items-end justify-end pb-1">
+                    {items.length > 1 ? (
+                      <button onClick={() => removeItem(idx)}
+                        className="w-10 h-10 rounded-xl hover:bg-red-100 text-red-500 bg-white border border-red-100 hover:text-red-700 flex items-center justify-center transition-colors shadow-sm">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    ) : <div className="w-10 h-10" />}
+                  </div>
+                </div>
+
+              </div>
+            )
+          })}
         </div>
 
         <button onClick={addItem}

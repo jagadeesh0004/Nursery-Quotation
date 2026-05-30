@@ -13,6 +13,14 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.xhtmlrenderer.pdf.ITextRenderer;
 
+import javax.imageio.ImageIO;
+import java.awt.AlphaComposite;
+import java.awt.Color;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
+import java.awt.geom.Ellipse2D;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.math.BigDecimal;
@@ -110,8 +118,8 @@ public class PdfGenerationService {
                     if (base64Logo.length() < 100) {
                         log.warn("⚠️  [PDF] Base64 is suspiciously small: {} bytes", base64Logo.length());
                     }
-                    logoTag = "<img src=\"data:image/webp;base64," + base64Logo
-                            + "\" width=\"94\" height=\"94\" style=\"border-radius:50%;border:2px solid #a5d6a7;object-fit:cover;\" />";
+                                logoTag = "<img src=\"data:image/png;base64," + base64Logo
+                                    + "\" width=\"94\" height=\"94\" style=\"display:block;\" />";
                     log.info("✅ [PDF] Image embedded in HTML");
                 } catch (Exception ex) {
                     log.error("❌ [PDF] Image download failed: {}", ex.getMessage(), ex);
@@ -349,14 +357,42 @@ public class PdfGenerationService {
                 throw new RuntimeException("Downloaded image is empty (0 bytes)");
             }
 
-            String base64 = Base64.getEncoder().encodeToString(imageData);
-            log.info("✅ [PDF] Base64 encoded successfully: {} chars", base64.length());
+            byte[] pngBytes = toCircularPng(imageData, 320);
+            String base64 = Base64.getEncoder().encodeToString(pngBytes);
+            log.info("✅ [PDF] Converted image to circular PNG and encoded: {} chars", base64.length());
             return base64;
         } catch (Exception ex) {
             log.error("❌ [PDF] Error reading image stream: {}", ex.getMessage(), ex);
             throw ex;
         } finally {
             connection.disconnect();
+        }
+    }
+
+    private byte[] toCircularPng(byte[] imageData, int size) throws Exception {
+        BufferedImage source = ImageIO.read(new ByteArrayInputStream(imageData));
+        if (source == null) {
+            throw new RuntimeException("ImageIO could not decode logo image");
+        }
+
+        int sourceWidth = source.getWidth();
+        int sourceHeight = source.getHeight();
+        int cropSize = Math.min(sourceWidth, sourceHeight);
+        int cropX = (sourceWidth - cropSize) / 2;
+        int cropY = (sourceHeight - cropSize) / 2;
+
+        BufferedImage resized = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D resizeGraphics = resized.createGraphics();
+        resizeGraphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+        resizeGraphics.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+        resizeGraphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        resizeGraphics.setClip(new Ellipse2D.Double(0, 0, size, size));
+        resizeGraphics.drawImage(source, 0, 0, size, size, cropX, cropY, cropX + cropSize, cropY + cropSize, null);
+        resizeGraphics.dispose();
+
+        try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
+            ImageIO.write(resized, "png", outputStream);
+            return outputStream.toByteArray();
         }
     }
 }

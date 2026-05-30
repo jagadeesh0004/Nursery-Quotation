@@ -9,7 +9,7 @@ import { Download, MapPin, Phone, Sprout, AlertCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { publicService } from '../services'
 import { Button, Skeleton } from '../components/ui'
-import { formatCurrency, formatDate, downloadBlob, getError, formatQuotationId } from '../utils'
+import { formatCurrency, formatNumber, formatDate, downloadBlob, getError, formatQuotationId } from '../utils'
 
 export default function PublicQuotationPage() {
   const { token } = useParams()
@@ -124,6 +124,13 @@ export default function PublicQuotationPage() {
             </div>
           </div>
 
+          {q.notes && (
+            <div className="px-4 sm:px-6 py-4 border-b border-gray-100 bg-white">
+              <p className="text-[11px] font-bold text-muted uppercase tracking-widest mb-2">Notes</p>
+              <p className="text-sm text-muted leading-relaxed whitespace-pre-line">{q.notes}</p>
+            </div>
+          )}
+
           {/* Items table */}
           <div className="overflow-x-auto border-x border-gray-200">
             <table className="w-full min-w-[600px] sm:min-w-max border-collapse">
@@ -133,7 +140,7 @@ export default function PublicQuotationPage() {
                   <th className="border border-[#4a912e] px-3 sm:px-5 py-3 text-[11px] font-semibold text-white/90 uppercase tracking-widest text-left">Plant Name</th>
                    <th className="border border-[#4a912e] px-3 sm:px-5 py-3 text-[11px] font-semibold text-white/90 uppercase tracking-widest text-left whitespace-nowrap">Bag / Pot Size</th>
                   <th className="border border-[#4a912e] px-3 sm:px-5 py-3 text-[11px] font-semibold text-white/90 uppercase tracking-widest text-right">Qty</th>
-                  <th className="border border-[#4a912e] px-3 sm:px-5 py-3 text-[11px] font-semibold text-white/90 uppercase tracking-widest text-right">Price/Pc</th>
+                  <th className="border border-[#4a912e] px-3 sm:px-5 py-3 text-[11px] font-semibold text-white/90 uppercase tracking-widest text-right">Rate</th>
                   <th className="border border-[#4a912e] px-3 sm:px-5 py-3 text-[11px] font-semibold text-white/90 uppercase tracking-widest text-right">Total</th>
                 </tr>
               </thead>
@@ -145,7 +152,7 @@ export default function PublicQuotationPage() {
                     <td className="border border-gray-200 px-3 sm:px-5 py-3.5 text-sm text-muted whitespace-nowrap">{item.dimension || '-'}</td>
                     <td className="border border-gray-200 px-3 sm:px-5 py-3.5 text-sm text-right text-muted font-mono">{item.quantity}</td>
                     <td className="border border-gray-200 px-3 sm:px-5 py-3.5 text-sm text-right text-muted font-mono">{formatCurrency(item.price)}</td>
-                    <td className="border border-gray-200 px-3 sm:px-5 py-3.5 text-sm text-right font-bold text-[#5CB338] font-mono">{formatCurrency(item.price * item.quantity)}</td>
+                    <td className="border border-gray-200 px-3 sm:px-5 py-3.5 text-sm text-right font-bold text-[#5CB338] font-mono">{formatNumber(item.price * item.quantity)}</td>
                   </tr>
                 ))}
               </tbody>
