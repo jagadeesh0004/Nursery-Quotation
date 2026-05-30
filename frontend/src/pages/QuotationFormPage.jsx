@@ -31,6 +31,7 @@ export default function QuotationFormPage() {
   const [errors,          setErrors]          = useState({})
   const [activeSearch,    setActiveSearch]    = useState(null)
   const [activeDimSearch, setActiveDimSearch] = useState(null)
+  const [quickAddLoading, setQuickAddLoading] = useState({})
 
   useEffect(() => {
     plantService.list()
@@ -150,6 +151,7 @@ export default function QuotationFormPage() {
       toast.error('Please enter Plant Name, Size, and Price to add to master')
       return
     }
+    setQuickAddLoading(prev => ({ ...prev, [`plant-${idx}`]: true }))
     try {
       const created = await plantService.create(it.plantName.trim())
       const plantId = created.data.data?.id
@@ -162,6 +164,8 @@ export default function QuotationFormPage() {
     } catch (err) {
       const message = getError(err)
       if (message) toast.error(message)
+    } finally {
+      setQuickAddLoading(prev => ({ ...prev, [`plant-${idx}`]: false }))
     }
   }
 
@@ -171,6 +175,7 @@ export default function QuotationFormPage() {
       toast.error('Please enter Size and Price to add to master')
       return
     }
+    setQuickAddLoading(prev => ({ ...prev, [`dimension-${idx}`]: true }))
     try {
       const plant = plants.find(p => p.name.toLowerCase() === it.plantName.toLowerCase())
       if (plant?.id) {
@@ -182,6 +187,8 @@ export default function QuotationFormPage() {
     } catch (err) {
       const message = getError(err)
       if (message) toast.error(message)
+    } finally {
+      setQuickAddLoading(prev => ({ ...prev, [`dimension-${idx}`]: false }))
     }
   }
 
@@ -253,6 +260,8 @@ export default function QuotationFormPage() {
             const existingPlant    = plants.find(p => p.name.toLowerCase() === (item.plantName || '').toLowerCase())
             const isCustomPlant    = item.plantName && !existingPlant
             const isNewDimension   = existingPlant && item.dimension && !getDimensions(item.plantName).some(d => (d.dimension || d.label)?.toLowerCase() === item.dimension.toLowerCase())
+            const isPlantQuickAdding = Boolean(quickAddLoading[`plant-${idx}`])
+            const isDimensionQuickAdding = Boolean(quickAddLoading[`dimension-${idx}`])
 
             const searchLower      = (item.plantName || '').toLowerCase()
             const filteredPlants   = activeSearch === idx ? plants.filter(p => p.name.toLowerCase().includes(searchLower)) : []
@@ -303,9 +312,9 @@ export default function QuotationFormPage() {
                         <p className="text-[10px] text-amber-600 font-medium bg-amber-50 px-1.5 py-0.5 rounded border border-amber-100 inline-block w-fit">
                           New Plant detected. You can add it to master.
                         </p>
-                        <button onClick={() => handleQuickAddPlant(idx)}
-                          className="text-[11px] bg-green-50 text-green-700 hover:bg-green-100 px-2.5 py-1.5 rounded-lg border border-green-200 transition-colors flex items-center gap-1 font-medium shadow-sm w-fit">
-                          <Plus className="w-3 h-3" /> Add "{item.plantName}" to Master
+                        <button onClick={() => handleQuickAddPlant(idx)} disabled={isPlantQuickAdding}
+                          className="text-[11px] bg-green-50 text-green-700 hover:bg-green-100 px-2.5 py-1.5 rounded-lg border border-green-200 transition-colors flex items-center gap-1 font-medium shadow-sm w-fit disabled:opacity-60 disabled:cursor-not-allowed">
+                          {isPlantQuickAdding ? <Spinner size="sm" className="text-green-700" /> : <Plus className="w-3 h-3" />} Add "{item.plantName}" to Master
                         </button>
                       </div>
                     )}
@@ -336,9 +345,9 @@ export default function QuotationFormPage() {
                         <p className="text-[10px] text-blue-600 font-medium bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100 inline-block w-fit">
                           New Size detected.
                         </p>
-                        <button onClick={() => handleQuickAddDimension(idx)}
-                          className="text-[11px] bg-blue-50 text-blue-700 hover:bg-blue-100 px-2.5 py-1.5 rounded-lg border border-blue-200 transition-colors flex items-center gap-1 font-medium shadow-sm w-fit text-left leading-tight">
-                          <Plus className="w-3 h-3 flex-shrink-0" /> Add "{item.dimension}" size
+                        <button onClick={() => handleQuickAddDimension(idx)} disabled={isDimensionQuickAdding}
+                          className="text-[11px] bg-blue-50 text-blue-700 hover:bg-blue-100 px-2.5 py-1.5 rounded-lg border border-blue-200 transition-colors flex items-center gap-1 font-medium shadow-sm w-fit text-left leading-tight disabled:opacity-60 disabled:cursor-not-allowed">
+                          {isDimensionQuickAdding ? <Spinner size="sm" className="text-blue-700" /> : <Plus className="w-3 h-3 flex-shrink-0" />} Add "{item.dimension}" size
                         </button>
                       </div>
                     )}
@@ -417,9 +426,9 @@ export default function QuotationFormPage() {
                         <p className="text-[10px] text-amber-600 font-medium bg-amber-50 px-1.5 py-0.5 rounded border border-amber-100 inline-block w-fit">
                           New Plant detected. You can add it to master.
                         </p>
-                        <button onClick={() => handleQuickAddPlant(idx)}
-                          className="text-[11px] bg-green-50 text-green-700 hover:bg-green-100 px-2.5 py-1.5 rounded-lg border border-green-200 transition-colors flex items-center gap-1 font-medium shadow-sm w-fit">
-                          <Plus className="w-3 h-3" /> Add "{item.plantName}" to Master
+                        <button onClick={() => handleQuickAddPlant(idx)} disabled={isPlantQuickAdding}
+                          className="text-[11px] bg-green-50 text-green-700 hover:bg-green-100 px-2.5 py-1.5 rounded-lg border border-green-200 transition-colors flex items-center gap-1 font-medium shadow-sm w-fit disabled:opacity-60 disabled:cursor-not-allowed">
+                          {isPlantQuickAdding ? <Spinner size="sm" className="text-green-700" /> : <Plus className="w-3 h-3" />} Add "{item.plantName}" to Master
                         </button>
                       </div>
                     )}
@@ -450,9 +459,9 @@ export default function QuotationFormPage() {
                         <p className="text-[10px] text-blue-600 font-medium bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100 inline-block w-fit">
                           New Size detected.
                         </p>
-                        <button onClick={() => handleQuickAddDimension(idx)}
-                          className="text-[11px] bg-blue-50 text-blue-700 hover:bg-blue-100 px-2.5 py-1.5 rounded-lg border border-blue-200 transition-colors flex items-center gap-1 font-medium shadow-sm w-fit text-left leading-tight">
-                          <Plus className="w-3 h-3 flex-shrink-0" /> Add "{item.dimension}" size
+                        <button onClick={() => handleQuickAddDimension(idx)} disabled={isDimensionQuickAdding}
+                          className="text-[11px] bg-blue-50 text-blue-700 hover:bg-blue-100 px-2.5 py-1.5 rounded-lg border border-blue-200 transition-colors flex items-center gap-1 font-medium shadow-sm w-fit text-left leading-tight disabled:opacity-60 disabled:cursor-not-allowed">
+                          {isDimensionQuickAdding ? <Spinner size="sm" className="text-blue-700" /> : <Plus className="w-3 h-3 flex-shrink-0" />} Add "{item.dimension}" size
                         </button>
                       </div>
                     )}
