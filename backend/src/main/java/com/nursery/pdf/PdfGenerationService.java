@@ -213,14 +213,14 @@ public class PdfGenerationService {
         sb.append("<thead>");
         sb.append("<tr style=\"background:#2e7d32;\">");
         sb.append("<th style=\"width:6%;  color:#fff; font-size:11px; font-weight:bold; text-transform:uppercase; padding:12px 8px; text-align:center; border:1px solid #4caf50; border-top:none; border-left:none;\">ID</th>");
-        sb.append("<th style=\"width:").append(heightEnabled ? "30%" : "32%").append("; color:#fff; font-size:11px; font-weight:bold; text-transform:uppercase; padding:12px 8px; text-align:left;   border:1px solid #4caf50; border-top:none;\">Plant Name</th>");
-        sb.append("<th style=\"width:").append(heightEnabled ? "12%" : "14%").append("; color:#fff; font-size:11px; font-weight:bold; text-transform:uppercase; padding:12px 8px; text-align:center; border:1px solid #4caf50; border-top:none;\">Size</th>");
+        sb.append("<th style=\"width:").append(heightEnabled ? "24%" : "26%").append("; color:#fff; font-size:11px; font-weight:bold; text-transform:uppercase; padding:12px 8px; text-align:left;   border:1px solid #4caf50; border-top:none;\">Plant Name</th>");
+        sb.append("<th style=\"width:").append(heightEnabled ? "12%" : "13%").append("; color:#fff; font-size:11px; font-weight:bold; text-transform:uppercase; padding:12px 8px; text-align:center; border:1px solid #4caf50; border-top:none;\">Size</th>");
         if (heightEnabled) {
             sb.append("<th style=\"width:12%; color:#fff; font-size:11px; font-weight:bold; text-transform:uppercase; padding:12px 8px; text-align:center; border:1px solid #4caf50; border-top:none;\">Height</th>");
         }
-        sb.append("<th style=\"width:").append(heightEnabled ? "10%" : "14%").append("; color:#fff; font-size:11px; font-weight:bold; text-transform:uppercase; padding:12px 8px; text-align:right;  border:1px solid #4caf50; border-top:none;\">Quantity</th>");
-        sb.append("<th style=\"width:").append(heightEnabled ? "10%" : "14%").append("; color:#fff; font-size:11px; font-weight:bold; text-transform:uppercase; padding:12px 8px; text-align:right;  border:1px solid #4caf50; border-top:none;\">Rate</th>");
-        sb.append("<th style=\"width:20%; color:#fff; font-size:11px; font-weight:bold; text-transform:uppercase; padding:12px 8px; text-align:right;  border:1px solid #4caf50; border-top:none; border-right:none;\">Total</th>");
+        sb.append("<th style=\"width:").append(heightEnabled ? "14%" : "16%").append("; color:#fff; font-size:11px; font-weight:bold; text-transform:uppercase; padding:12px 8px; text-align:right;  border:1px solid #4caf50; border-top:none;\">Quantity</th>");
+        sb.append("<th style=\"width:").append(heightEnabled ? "14%" : "16%").append("; color:#fff; font-size:11px; font-weight:bold; text-transform:uppercase; padding:12px 8px; text-align:right;  border:1px solid #4caf50; border-top:none;\">Rate</th>");
+        sb.append("<th style=\"width:").append(heightEnabled ? "22%" : "17%").append("; color:#fff; font-size:11px; font-weight:bold; text-transform:uppercase; padding:12px 8px; text-align:right;  border:1px solid #4caf50; border-top:none; border-right:none;\">Total</th>");
         sb.append("</tr>");
         sb.append("</thead>");
         sb.append("<tbody>");
