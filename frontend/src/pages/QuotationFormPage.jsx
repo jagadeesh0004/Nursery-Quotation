@@ -13,7 +13,7 @@ import { quotationService, plantService } from '../services'
 import { Button, Input, Textarea, Spinner, SectionCard } from '../components/ui'
 import { formatCurrency, formatNumber, getError, cx } from '../utils'
 
-const newItem = () => ({ plantName: '', dimension: '', quantity: '', price: '' })
+const newItem = () => ({ plantName: '', dimension: '', height: '', quantity: '', price: '' })
 
 export default function QuotationFormPage() {
   const { id }   = useParams()
@@ -25,6 +25,7 @@ export default function QuotationFormPage() {
   const [customerPhone,   setCustomerPhone]   = useState('')
   const [customerAddress, setCustomerAddress] = useState('')
   const [notes,           setNotes]           = useState('')
+  const [heightEnabled,   setHeightEnabled]   = useState(false)
   const [items,           setItems]           = useState([newItem()])
   const [pageLoading,     setPageLoading]     = useState(isEdit)
   const [saving,          setSaving]          = useState(false)
@@ -51,8 +52,9 @@ export default function QuotationFormPage() {
       setCustomerPhone(q.customerPhone || '')
       setCustomerAddress(q.customerAddress || '')
       setNotes(q.notes || '')
+      setHeightEnabled(Boolean(q.heightEnabled))
       setItems(q.items?.length ? q.items.map(i => ({
-        plantName: i.plantName || '', dimension: i.dimension || '',
+        plantName: i.plantName || '', dimension: i.dimension || '', height: i.height || '',
         quantity: i.quantity ?? 0, price: i.price ?? '',
       })) : [newItem()])
     }).catch((err) => {
@@ -89,6 +91,11 @@ export default function QuotationFormPage() {
 
   const allUniqueDimensions = Array.from(new Set(plants.flatMap(p => p.dimensions?.map(d => d.dimension || d.label) || []))).filter(Boolean).sort()
 
+  const desktopCols = heightEnabled
+    ? '3fr 1.75fr 1.5fr 1.75fr 1.75fr 1.75fr 0.75fr'
+    : '3.25fr 2.25fr 1.75fr 2fr 2fr 1fr'
+
+     //const desktopCols = '3.25fr 2.25fr 1.75fr 2fr 2fr 1fr'
   function validate(shouldFinalize) {
     const errs = {}
     if (shouldFinalize && !customerName.trim()) errs.customerName = 'Customer name is required'
@@ -100,6 +107,9 @@ export default function QuotationFormPage() {
       if (it.plantName && (it.price === '' || it.price === null || it.price === undefined)) {
         if (!errs.itemRows) errs.itemRows = {}
         errs.itemRows[i] = 'Price is required'
+      } else if (heightEnabled && it.plantName && (!it.height || !it.height.trim())) {
+        if (!errs.itemRows) errs.itemRows = {}
+        errs.itemRows[i] = 'Height is required when enabled'
       }
     })
     setErrors(errs)
@@ -125,9 +135,11 @@ export default function QuotationFormPage() {
         customerPhone:   customerPhone.trim()   || undefined,
         customerAddress: customerAddress.trim() || undefined,
         notes:           notes.trim()           || undefined,
+        heightEnabled,
         items: items.filter(it => it.plantName).map(it => ({
           plantName: it.plantName,
           dimension: it.dimension,
+          height: heightEnabled ? (it.height || '').trim() : undefined,
           quantity:  parseInt(it.quantity) || 0,
           price:     parseFloat(it.price)  || 0,
         })),
@@ -192,13 +204,23 @@ export default function QuotationFormPage() {
     }
   }
 
+  function toggleHeightEnabled() {
+    setHeightEnabled(prev => {
+      const next = !prev
+      if (!next) {
+        setItems(current => current.map(item => ({ ...item, height: '' })))
+      }
+      return next
+    })
+  }
+
   if (pageLoading) return (
     <div className="flex items-center justify-center h-64 gap-3 text-muted">
       <Spinner size="md" /> Loading quotation...
     </div>
   )
 
-  const desktopCols = '3.25fr 2.25fr 1.75fr 2fr 2fr 1fr'
+ 
 
   return (
     <div className="animate-fade-up max-w-3xl">
@@ -232,6 +254,26 @@ export default function QuotationFormPage() {
 
       {/* Items */}
       <SectionCard title="Items" icon="🌿" className="mb-4">
+        <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-xl border border-green-100 bg-green-50/60 px-4 py-3">
+          <div>
+            <p className="text-sm font-semibold text-ink">Height option</p>
+            <p className="text-xs text-muted">Turn this on only for quotations that need height values on every plant row.</p>
+          </div>
+          <button
+            type="button"
+            onClick={toggleHeightEnabled}
+            className={cx(
+              'inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-colors border',
+              heightEnabled
+                ? 'bg-green-600 text-white border-green-600'
+                : 'bg-white text-muted border-gray-200 hover:border-green-300 hover:text-[#5CB338]'
+            )}
+          >
+            <span className={cx('w-2.5 h-2.5 rounded-full', heightEnabled ? 'bg-white' : 'bg-gray-300')} />
+            {heightEnabled ? 'Height enabled' : 'Height disabled'}
+          </button>
+        </div>
+
         {errors.items && (
           <div className="mb-3 flex items-center gap-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2">
             <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" /> {errors.items}
@@ -245,7 +287,8 @@ export default function QuotationFormPage() {
         >
           {[
             ['Plant Name', ''],
-            ['Bag Size / Dimension', ''],
+            ['Bag Size', ''],
+            ...(heightEnabled ? [['Height', '']] : []),
             ['Qty', 'text-center'],
             ['Rate', ''],
             ['Total', 'text-right'],
@@ -352,6 +395,19 @@ export default function QuotationFormPage() {
                       </div>
                     )}
                   </div>
+
+                  {heightEnabled && (
+                    <div className="flex flex-col relative">
+                      <input
+                        type="text"
+                        autoComplete="off"
+                        value={item.height || ''}
+                        onChange={e => updateItem(idx, 'height', e.target.value)}
+                        placeholder="6 inch, 6 ft, 6'"
+                        className="field bg-white w-full text-sm"
+                      />
+                    </div>
+                  )}
 
                   {/* Qty */}
                   <div className="flex flex-col">
@@ -466,6 +522,20 @@ export default function QuotationFormPage() {
                       </div>
                     )}
                   </div>
+
+                  {heightEnabled && (
+                    <div className="col-span-12 flex flex-col">
+                      <label className="block text-[10px] font-semibold text-muted uppercase mb-1.5">Height</label>
+                      <input
+                        type="text"
+                        autoComplete="off"
+                        value={item.height || ''}
+                        onChange={e => updateItem(idx, 'height', e.target.value)}
+                        placeholder="6 inch, 6 ft, 6'"
+                        className="field bg-white w-full text-sm"
+                      />
+                    </div>
+                  )}
 
                   {/* Qty */}
                   <div className="col-span-5 flex flex-col">

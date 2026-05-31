@@ -101,6 +101,7 @@ public class PdfGenerationService {
         String customerPhone   = e(d(quotation.getCustomerPhone()));
         String customerAddress = e(d(quotation.getCustomerAddress()));
         String totalAmount     = formatMoney(quotation.getTotalAmount());
+        boolean heightEnabled  = quotation.isHeightEnabled();
 
         // ── Logo ──
         String logoTag;
@@ -212,10 +213,13 @@ public class PdfGenerationService {
         sb.append("<thead>");
         sb.append("<tr style=\"background:#2e7d32;\">");
         sb.append("<th style=\"width:6%;  color:#fff; font-size:11px; font-weight:bold; text-transform:uppercase; padding:12px 8px; text-align:center; border:1px solid #4caf50; border-top:none; border-left:none;\">ID</th>");
-        sb.append("<th style=\"width:32%; color:#fff; font-size:11px; font-weight:bold; text-transform:uppercase; padding:12px 8px; text-align:left;   border:1px solid #4caf50; border-top:none;\">Plant Name</th>");
-        sb.append("<th style=\"width:14%; color:#fff; font-size:11px; font-weight:bold; text-transform:uppercase; padding:12px 8px; text-align:center; border:1px solid #4caf50; border-top:none;\">Size</th>");
-        sb.append("<th style=\"width:14%; color:#fff; font-size:11px; font-weight:bold; text-transform:uppercase; padding:12px 8px; text-align:right;  border:1px solid #4caf50; border-top:none;\">Quantity</th>");
-        sb.append("<th style=\"width:14%; color:#fff; font-size:11px; font-weight:bold; text-transform:uppercase; padding:12px 8px; text-align:right;  border:1px solid #4caf50; border-top:none;\">Rate</th>");
+        sb.append("<th style=\"width:").append(heightEnabled ? "30%" : "32%").append("; color:#fff; font-size:11px; font-weight:bold; text-transform:uppercase; padding:12px 8px; text-align:left;   border:1px solid #4caf50; border-top:none;\">Plant Name</th>");
+        sb.append("<th style=\"width:").append(heightEnabled ? "12%" : "14%").append("; color:#fff; font-size:11px; font-weight:bold; text-transform:uppercase; padding:12px 8px; text-align:center; border:1px solid #4caf50; border-top:none;\">Size</th>");
+        if (heightEnabled) {
+            sb.append("<th style=\"width:12%; color:#fff; font-size:11px; font-weight:bold; text-transform:uppercase; padding:12px 8px; text-align:center; border:1px solid #4caf50; border-top:none;\">Height</th>");
+        }
+        sb.append("<th style=\"width:").append(heightEnabled ? "10%" : "14%").append("; color:#fff; font-size:11px; font-weight:bold; text-transform:uppercase; padding:12px 8px; text-align:right;  border:1px solid #4caf50; border-top:none;\">Quantity</th>");
+        sb.append("<th style=\"width:").append(heightEnabled ? "10%" : "14%").append("; color:#fff; font-size:11px; font-weight:bold; text-transform:uppercase; padding:12px 8px; text-align:right;  border:1px solid #4caf50; border-top:none;\">Rate</th>");
         sb.append("<th style=\"width:20%; color:#fff; font-size:11px; font-weight:bold; text-transform:uppercase; padding:12px 8px; text-align:right;  border:1px solid #4caf50; border-top:none; border-right:none;\">Total</th>");
         sb.append("</tr>");
         sb.append("</thead>");
@@ -224,10 +228,14 @@ public class PdfGenerationService {
         for (QuotationItem item : quotation.getItems()) {
             if (item.getPlantName() == null || item.getPlantName().isBlank()) continue;
             String bg = (idx % 2 == 0) ? "#fafbfc" : "#ffffff";
+            String itemHeight = e(d(item.getHeight()));
             sb.append("<tr style=\"background:").append(bg).append(";\">");
             sb.append("<td style=\"padding:12px 8px; text-align:center; font-size:12px; color:#333; border:1px solid #e0e0e0; border-left:none;\">").append(idx).append("</td>");
             sb.append("<td style=\"padding:12px 8px; text-align:left;   font-size:12px; color:#333; border:1px solid #e0e0e0;\">").append(e(d(item.getPlantName()))).append("</td>");
             sb.append("<td style=\"padding:12px 8px; text-align:center; font-size:12px; color:#333; border:1px solid #e0e0e0;\">").append(e(d(item.getDimension()))).append("</td>");
+            if (heightEnabled) {
+                sb.append("<td style=\"padding:12px 8px; text-align:center; font-size:12px; color:#333; border:1px solid #e0e0e0;\">").append(itemHeight).append("</td>");
+            }
             sb.append("<td style=\"padding:12px 8px; text-align:right;  font-size:12px; color:#333; border:1px solid #e0e0e0;\">").append(item.getQuantity() == null ? 0 : item.getQuantity()).append("</td>");
             sb.append("<td style=\"padding:12px 8px; text-align:right;  font-size:12px; color:#333; border:1px solid #e0e0e0;\">").append(formatMoney(item.getPrice())).append("</td>");
             sb.append("<td style=\"padding:12px 8px; text-align:right;  font-size:12px; color:#333; font-weight:500; border:1px solid #e0e0e0; border-right:none;\">").append(formatMoney(item.getItemTotal())).append("</td>");

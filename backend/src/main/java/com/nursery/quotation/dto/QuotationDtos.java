@@ -25,6 +25,9 @@ public class QuotationDtos {
              @Size(max = 20)
              String dimension,
 
+            @Size(max = 20, message = "Height must not exceed 20 characters")
+            String height,
+
             @NotNull(message = "Quantity is required")
             @Min(value = 1, message = "Quantity must be at least 1")
             Integer quantity,
@@ -41,6 +44,8 @@ public class QuotationDtos {
             String customerAddress,
             String notes,
 
+            Boolean heightEnabled,
+
             @Valid
             List<QuotationItemRequest> items,
 
@@ -54,6 +59,8 @@ public class QuotationDtos {
             String customerAddress,
             String notes,
 
+            Boolean heightEnabled,
+
             @Valid
             List<QuotationItemRequest> items,
 
@@ -66,6 +73,7 @@ public class QuotationDtos {
             Long id,
             String plantName,
             String dimension,
+            String height,
             Integer quantity,
             BigDecimal price,
             BigDecimal itemTotal
@@ -79,6 +87,7 @@ public class QuotationDtos {
             String customerPhone,
             String customerAddress,
             String notes,
+            Boolean heightEnabled,
             String nurseryName,
             String nurseryAddress,
             String nurseryPhone,

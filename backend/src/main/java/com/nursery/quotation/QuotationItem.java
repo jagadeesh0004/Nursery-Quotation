@@ -44,6 +44,10 @@ public class QuotationItem {
     @Column(name = "dimension", nullable = false, length = 20)
     private String dimension;
 
+    @Size(max = 20, message = "Height must not exceed 20 characters")
+    @Column(name = "height", length = 20)
+    private String height;
+
     @NotNull(message = "Quantity is required")
     @Min(value = 1, message = "Quantity must be at least 1")
     @Max(value = 100000, message = "Quantity cannot exceed 100000")
