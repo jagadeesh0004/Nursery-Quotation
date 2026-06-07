@@ -65,4 +65,12 @@ export function getUnitWeightFromDimension(dim) {
   return 0
 }
 
+export function formatWeight(kg) {
+  const n = Number(kg) || 0
+  if (n > 1000) {
+    return `${(n / 1000).toFixed(2)} tons`
+  }
+  return `${n.toFixed(1)} kg`
+}
+
 export default WEIGHT_MAP

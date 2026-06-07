@@ -13,7 +13,7 @@ import { useAuth } from '../context/AuthContext'
 import { quotationService } from '../services'
 import { Button, Badge, Skeleton, ConfirmDialog, Card } from '../components/ui'
 import { formatCurrency, formatNumber, formatDate, downloadBlob, getError, formatQuotationId } from '../utils'
-import { getUnitWeightFromDimension } from '../constants/weightMapping'
+import { getUnitWeightFromDimension, formatWeight } from '../constants/weightMapping'
 
 export default function QuotationDetailPage() {
   const { id } = useParams()
@@ -193,7 +193,7 @@ export default function QuotationDetailPage() {
             </div>
             <div className="flex items-center gap-3 mt-1">
               <span className="text-sm font-semibold text-muted uppercase tracking-widest">Net Weight</span>
-              <span className="text-xl font-bold text-ink font-mono">{totalNetWeight.toFixed(1)} kg</span>
+              <span className="text-xl font-bold text-ink font-mono">{formatWeight(totalNetWeight)}</span>
             </div>
           </div>
           <div className="hidden sm:block w-px h-8 bg-gray-200"></div>
