@@ -13,6 +13,7 @@ import { useAuth } from '../context/AuthContext'
 import { quotationService } from '../services'
 import { Button, Badge, Skeleton, ConfirmDialog, Card } from '../components/ui'
 import { formatCurrency, formatNumber, formatDate, downloadBlob, getError, formatQuotationId } from '../utils'
+import { getUnitWeightFromDimension } from '../constants/weightMapping'
 
 export default function QuotationDetailPage() {
   const { id } = useParams()
@@ -93,6 +94,11 @@ export default function QuotationDetailPage() {
   const formattedId = q.quotationNumber || '-'
   const showHeight = Boolean(q.heightEnabled)
   const totalQuantity = (q.items || []).reduce((sum, it) => sum + (parseInt(it.quantity) || 0), 0)
+  const totalNetWeight = (q.items || []).reduce((sum, it) => {
+    const qty = parseInt(it.quantity) || 0
+    const unit = getUnitWeightFromDimension(it.dimension)
+    return sum + unit * qty
+  }, 0)
 
   return (
     <div className="animate-fade-up max-w-3xl">
@@ -180,9 +186,15 @@ export default function QuotationDetailPage() {
 
         {/* Grand total */}
         <div className="flex flex-col sm:flex-row justify-end items-end sm:items-center gap-3 sm:gap-8 px-4 sm:px-6 py-4 sm:py-5 border-t border-gray-100 bg-gray-50/50">
-          <div className="flex items-center gap-3">
-            <span className="text-sm font-semibold text-muted uppercase tracking-widest">Total Qty</span>
-            <span className="text-xl font-bold text-ink font-mono">{totalQuantity}</span>
+          <div className="flex flex-col">
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-semibold text-muted uppercase tracking-widest">Total Qty</span>
+              <span className="text-xl font-bold text-ink font-mono">{totalQuantity}</span>
+            </div>
+            <div className="flex items-center gap-3 mt-1">
+              <span className="text-sm font-semibold text-muted uppercase tracking-widest">Net Weight</span>
+              <span className="text-xl font-bold text-ink font-mono">{totalNetWeight.toFixed(1)} kg</span>
+            </div>
           </div>
           <div className="hidden sm:block w-px h-8 bg-gray-200"></div>
           <div className="flex items-center gap-3">

@@ -28,8 +28,13 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
 import java.util.Base64;
+import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * ✅ PDF Generation Service with:
@@ -47,6 +52,8 @@ public class PdfGenerationService {
     private final QuotationRepository quotationRepository;
     private final NurseryProfileRepository profileRepository;
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+    private static final Pattern FIRST_NUMBER_PATTERN = Pattern.compile("(\\d+(?:\\.\\d+)?)");
+    private static final Map<String, Double> WEIGHT_MAP = createWeightMap();
 
     public byte[] generate(Quotation quotation) {
         NurseryProfile profile = profileRepository
@@ -57,7 +64,14 @@ public class PdfGenerationService {
                 .mapToInt(item -> item.getQuantity() == null ? 0 : item.getQuantity())
                 .sum();
 
-        String html = buildQuotationHtml(quotation, profile, totalQuantity);
+        double totalNetWeight = quotation.getItems().stream()
+            .mapToDouble(item -> {
+                int quantity = item.getQuantity() == null ? 0 : item.getQuantity();
+                return getUnitWeight(item.getDimension()) * quantity;
+            })
+            .sum();
+
+        String html = buildQuotationHtml(quotation, profile, totalQuantity, totalNetWeight);
 
         try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             ITextRenderer renderer = new ITextRenderer();
@@ -86,7 +100,7 @@ public class PdfGenerationService {
         return generate(quotation);
     }
 
-    private String buildQuotationHtml(Quotation quotation, NurseryProfile profile, int totalQuantity) {
+    private String buildQuotationHtml(Quotation quotation, NurseryProfile profile, int totalQuantity, double totalNetWeight) {
 
         String nurseryName     = e(profile != null ? profile.getNurseryName() : "Nursery Name");
         String ownerName       = e(profile != null ? profile.getOwnerName()   : "Owner");
@@ -251,6 +265,7 @@ public class PdfGenerationService {
         sb.append("<tr>");
         sb.append("<td width=\"55%\" valign=\"top\" style=\"padding-top:16px;\">");
         sb.append("<div style=\"font-size:12px; color:#666666;\">Total Quantity: <span style=\"font-weight:bold; color:#333333; font-size:13px;\">").append(totalQuantity).append("</span></div>");
+        sb.append("<div style=\"font-size:12px; color:#666666; margin-top:6px;\">Total Weight: <span style=\"font-weight:bold; color:#333333; font-size:13px;\">").append(formatWeight(totalNetWeight)).append("</span></div>");
         sb.append("</td>");
         sb.append("<td width=\"45%\" align=\"right\" valign=\"top\">");
         sb.append("<table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background:#f1f8f1; border:1px solid #d0e7d2; border-radius:6px; width:100%;\">");
@@ -305,6 +320,52 @@ public class PdfGenerationService {
 
     private String formatMoney(BigDecimal v) {
         return v == null ? "Rs. 0.00" : "Rs. " + String.format("%.2f", v);
+    }
+
+    private String formatWeight(double kg) {
+        if (kg > 1000.0) {
+            return String.format(Locale.US, "%.2f tons", kg / 1000.0);
+        }
+        return String.format(Locale.US, "%.1f kg", kg);
+    }
+
+    private static Map<String, Double> createWeightMap() {
+        Map<String, Double> map = new HashMap<>();
+        map.put("3\"", 0.09);
+        map.put("4\"", 0.12);
+        map.put("6\"", 0.25);
+        map.put("8\"", 0.45);
+        map.put("10\"", 0.85);
+        map.put("12\"", 1.2);
+        map.put("15x15", 16.0);
+        map.put("20kgs", 20.0);
+        map.put("21x21", 50.0);
+        return map;
+    }
+
+    private double getUnitWeight(String dimension) {
+        if (dimension == null || dimension.isBlank()) {
+            return 0.0;
+        }
+
+        String normalized = dimension.trim().toLowerCase(Locale.US).replaceAll("\\s+", "");
+        normalized = normalized.replace("“", "\"").replace("”", "\"");
+
+        Double mapped = WEIGHT_MAP.get(normalized);
+        if (mapped != null) {
+            return mapped;
+        }
+
+        Matcher matcher = FIRST_NUMBER_PATTERN.matcher(normalized);
+        if (matcher.find()) {
+            try {
+                return Double.parseDouble(matcher.group(1));
+            } catch (NumberFormatException ignored) {
+                return 0.0;
+            }
+        }
+
+        return 0.0;
     }
 
     private String d(String v) {

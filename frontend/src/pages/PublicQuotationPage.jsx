@@ -10,6 +10,7 @@ import toast from 'react-hot-toast'
 import { publicService } from '../services'
 import { Button, Skeleton } from '../components/ui'
 import { formatCurrency, formatNumber, formatDate, downloadBlob, getError, formatQuotationId } from '../utils'
+import { getUnitWeightFromDimension } from '../constants/weightMapping'
 
 export default function PublicQuotationPage() {
   const { token } = useParams()
@@ -69,6 +70,11 @@ export default function PublicQuotationPage() {
   const formattedId = formatQuotationId(displayNurseryName, q.id)
   const showHeight = Boolean(q.heightEnabled)
   const totalQuantity = (q.items || []).reduce((sum, it) => sum + (parseInt(it.quantity) || 0), 0)
+  const totalNetWeight = (q.items || []).reduce((sum, it) => {
+    const qty = parseInt(it.quantity) || 0
+    const unit = getUnitWeightFromDimension(it.dimension)
+    return sum + unit * qty
+  }, 0)
 
   return (
     <div className="min-h-screen bg-surface py-8 px-4">
@@ -164,10 +170,16 @@ export default function PublicQuotationPage() {
 
           {/* Grand total row */}
           <div className="flex flex-col sm:flex-row justify-end items-end sm:items-center gap-3 sm:gap-8 px-4 sm:px-6 py-4 sm:py-5 border-t border-gray-100 bg-gray-50/50">
-            <div className="flex items-center gap-3">
-              <span className="text-sm font-semibold text-muted uppercase tracking-widest">Total Qty</span>
-              <span className="text-xl font-bold text-ink font-mono">{totalQuantity}</span>
-            </div>
+              <div className="flex flex-col">
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-semibold text-muted uppercase tracking-widest">Total Qty</span>
+                  <span className="text-xl font-bold text-ink font-mono">{totalQuantity}</span>
+                </div>
+                <div className="flex items-center gap-3 mt-1">
+                  <span className="text-sm font-semibold text-muted uppercase tracking-widest">Net Weight</span>
+                  <span className="text-xl font-bold text-ink font-mono">{totalNetWeight.toFixed(1)} kg</span>
+                </div>
+              </div>
             <div className="hidden sm:block w-px h-8 bg-gray-200"></div>
             <div className="flex items-center gap-3">
               <span className="text-sm font-semibold text-muted uppercase tracking-widest">Grand Total</span>
