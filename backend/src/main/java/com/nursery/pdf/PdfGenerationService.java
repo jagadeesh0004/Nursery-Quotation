@@ -323,43 +323,83 @@ public class PdfGenerationService {
     }
 
     private String formatWeight(double kg) {
-        if (kg > 1000.0) {
-            return String.format(Locale.US, "%.2f tons", kg / 1000.0);
+        if (kg >= 1000.0) {
+            double tons = kg / 1000.0;
+            return String.format(Locale.US, "%.1f tons", tons);
         }
         return String.format(Locale.US, "%.1f kg", kg);
     }
 
     private static Map<String, Double> createWeightMap() {
         Map<String, Double> map = new HashMap<>();
-        map.put("3\"", 0.09);
-        map.put("4\"", 0.12);
-        map.put("6\"", 0.25);
-        map.put("8\"", 0.45);
-        map.put("10\"", 0.85);
-        map.put("12\"", 1.2);
-        map.put("15x15", 16.0);
-        map.put("20kgs", 20.0);
+        // Bag dimensions
+        map.put("5x6", 0.5);
+        map.put("6x8", 0.9);
+        map.put("7x8", 1.3);
+        map.put("8x10", 3.3);
+        map.put("9x10", 4.5);
+        map.put("10x12", 6.0);
+        map.put("12x12", 7.5);
+        map.put("12x13", 8.0);
+        map.put("13x13", 8.0);
+        map.put("14x15", 16.0);
+        map.put("15x16", 16.0);
+        map.put("16x16", 22.0);
+        map.put("18x18", 30.0);
+        map.put("20x20", 40.0);
         map.put("21x21", 50.0);
+        map.put("24x24", 75.0);
+        map.put("25x25", 85.0);
+        map.put("30x30", 150.0);
+        map.put("36x36", 220.0);
+        map.put("40x40", 250.0);
+        // Pot sizes (inches)
+        map.put("3\"", 0.5);
+        map.put("4\"", 1.0);
+        map.put("5\"", 1.5);
+        map.put("6\"", 2.0);
+        map.put("7\"", 3.0);
+        map.put("8\"", 4.0);
+        map.put("9\"", 6.0);
+        map.put("10\"", 8.0);
+        map.put("11\"", 10.0);
+        map.put("12\"", 12.0);
+        map.put("13\"", 13.5);
+        map.put("14\"", 15.0);
+        map.put("15\"", 18.0);
+        map.put("16\"", 22.0);
+        map.put("17\"", 26.0);
+        map.put("18\"", 30.0);
+        map.put("20\"", 50.0);
+        map.put("24\"", 80.0);
+        map.put("30\"", 150.0);
+        map.put("36\"", 220.0);
+        map.put("40\"", 250.0);
         return map;
     }
 
     private double getUnitWeight(String dimension) {
-        if (dimension == null || dimension.isBlank()) {
-            return 0.0;
+        if (dimension == null || dimension.isBlank()) return 0.0;
+
+        String k = dimension.trim().toLowerCase(Locale.US).replaceAll("\\s+", "");
+        k = k.replace("“", "\"").replace("”", "\"");
+
+        // direct map lookup
+        Double v = WEIGHT_MAP.get(k);
+        if (v != null) return v;
+
+        // if numeric like '3' try '3"' (frontend does this)
+        if (k.matches("^\\d+(?:\\.\\d+)?$")) {
+            String withInch = k + "\"";
+            v = WEIGHT_MAP.get(withInch);
+            if (v != null) return v;
         }
 
-        String normalized = dimension.trim().toLowerCase(Locale.US).replaceAll("\\s+", "");
-        normalized = normalized.replace("“", "\"").replace("”", "\"");
-
-        Double mapped = WEIGHT_MAP.get(normalized);
-        if (mapped != null) {
-            return mapped;
-        }
-
-        Matcher matcher = FIRST_NUMBER_PATTERN.matcher(normalized);
-        if (matcher.find()) {
+        // fallback: extract first number and return it (same as frontend)
+        Matcher m = FIRST_NUMBER_PATTERN.matcher(k);
+        if (m.find()) {
             try {
-                return Double.parseDouble(matcher.group(1));
+                return Double.parseDouble(m.group(1));
             } catch (NumberFormatException ignored) {
                 return 0.0;
             }

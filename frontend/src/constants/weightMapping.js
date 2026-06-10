@@ -67,9 +67,19 @@ export function getUnitWeightFromDimension(dim) {
 
 export function formatWeight(kg) {
   const n = Number(kg) || 0
-  if (n > 1000) {
-    return `${(n / 1000).toFixed(2)} tons`
+  // Round to 1 significant figure
+  function roundToSignificant(x, sig = 1) {
+    if (x === 0) return 0
+    const d = Math.ceil(Math.log10(Math.abs(x)))
+    const factor = Math.pow(10, sig - d)
+    return Math.round(x * factor) / factor
   }
+
+  if (n >= 1000) {
+    const tons = n / 1000
+    return `${tons.toFixed(1)} tons`
+  }
+
   return `${n.toFixed(1)} kg`
 }
 
