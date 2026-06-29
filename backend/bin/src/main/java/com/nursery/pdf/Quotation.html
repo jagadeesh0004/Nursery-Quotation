@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <style>
+        /* ── RESET ── */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        /* ── COLOUR PALETTE ── */
+        :root {
+          --navy:        #1a4799;
+          --navy-dark:   #122f6b;
+          --navy-light:  #dce8f8;
+          --maroon:      #800020;
+          --orange:      #e07b00;
+          --orange-soft: #fff3e0;
+          --green:       #3a7d2c;
+          --green-soft:  #eaf4e6;
+          --grey-line:   #d8dce8;
+          --grey-bg:     #f7f8fc;
+          --text-dark:   #1e2233;
+          --text-mid:    #444;
+          --white:       #ffffff;
+        }
+
+        /* ── PAGE ── */
+        body {
+          font-family: 'Arial', sans-serif;
+          font-size: 12.5px;
+          color: var(--text-dark);
+          background: var(--white);
+          padding: 0;
+        }
+
+        /* ══════════════════════════════════════════
+           TOP BANNER — right-only strip (no blue ribbon)
+        ══════════════════════════════════════════ */
+        .top-banner-wrap {
+          display: flex;
+          justify-content: flex-end;
+          height: 40px;
+          margin-bottom: 0;
+        }
+        .top-banner-left {
+          display: none;
+        }
+        .top-banner-right {
+          width: 42%;
+          background: linear-gradient(135deg, var(--navy-dark) 0%, var(--navy) 100%);
+          display: flex;
+          align-items: center;
+          justify-content: flex-end;
+          padding: 0 20px;
+          gap: 18px;
+          clip-path: polygon(18px 0%, 100% 0%, 100% 100%, 0% 100%);
+        }
+        .top-banner-right span {
+          color: #fff;
+          font-size: 11.5px;
+          font-weight: bold;
+          white-space: nowrap;
+          letter-spacing: 0.3px;
+        }
+        .top-banner-right .sep {
+          color: rgba(255,255,255,0.35);
+          font-size: 16px;
+          font-weight: 100;
+        }
+
+        /* ══════════════════════════════════════════
+           HEADER — logo + nursery name
+        ══════════════════════════════════════════ */
+        .header-row {
+          display: flex;
+          align-items: center;
+          gap: 18px;
+          padding: 14px 28px 10px 28px;
+          background: var(--white);
+        }
+        .logo-circle {
+          width: 80px;
+          height: 80px;
+          border-radius: 50%;
+          border: 3px solid var(--navy-light);
+          box-shadow: 0 2px 10px rgba(26,71,153,0.15);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 10px;
+          color: #999;
+          flex-shrink: 0;
+          overflow: hidden;
+          background: #f0f4fc;
+        }
+        .logo-circle img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          border-radius: 50%;
+        }
+        .nursery-details {
+          flex: 1;
+          text-align: center;
+        }
+        .nursery-name {
+          font-size: 32px;
+          font-weight: bold;
+          color: var(--maroon);
+          line-height: 1.05;
+          letter-spacing: 0.5px;
+          text-shadow: 1px 1px 2px rgba(128,0,32,0.10);
+        }
+        .nursery-sub {
+          font-size: 11.5px;
+          font-style: italic;
+          font-weight: bold;
+          color: var(--text-mid);
+          margin-top: 4px;
+          letter-spacing: 0.2px;
+        }
+        .nursery-prop {
+          display: inline-block;
+          font-size: 12px;
+          font-weight: bold;
+          color: var(--navy);
+          margin-top: 5px;
+          background: var(--navy-light);
+          padding: 2px 14px;
+          border-radius: 20px;
+        }
+
+        /* ══════════════════════════════════════════
+           ORANGE DIVIDER — gradient bar
+        ══════════════════════════════════════════ */
+        .orange-line {
+          height: 3.5px;
+          background: linear-gradient(90deg, var(--navy) 0%, var(--orange) 50%, var(--navy) 100%);
+          margin: 0 28px 0 28px;
+        }
+
+        /* ══════════════════════════════════════════
+           ADDRESS ROW
+        ══════════════════════════════════════════ */
+        .address-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          font-size: 11px;
+          color: var(--text-mid);
+          padding: 6px 28px 10px 28px;
+          border-bottom: 1px solid var(--grey-line);
+        }
+        .address-row .addr-text {
+          color: var(--orange);
+          font-weight: 600;
+        }
+        .address-row .email-text {
+          color: var(--text-dark);
+        }
+        .address-row .email-text b {
+          color: var(--navy-dark);
+        }
+
+        /* ══════════════════════════════════════════
+           QUOTATION TITLE — banner style
+        ══════════════════════════════════════════ */
+        .quotation-title-wrap {
+          text-align: center;
+          padding: 14px 28px 10px 28px;
+          position: relative;
+        }
+        .quotation-title {
+          display: inline-block;
+          font-size: 22px;
+          font-weight: bold;
+          color: var(--navy);
+          letter-spacing: 6px;
+          text-transform: uppercase;
+          padding: 5px 36px;
+          border-top: 2px solid var(--navy-light);
+          border-bottom: 2px solid var(--navy-light);
+          position: relative;
+        }
+        .quotation-title::before,
+        .quotation-title::after {
+          content: '';
+          position: absolute;
+          top: 50%;
+          transform: translateY(-50%);
+          width: 28px;
+          height: 2px;
+          background: var(--orange);
+        }
+        .quotation-title::before { left: 0; }
+        .quotation-title::after  { right: 0; }
+
+        /* ══════════════════════════════════════════
+           DETAILS SECTION — cards
+        ══════════════════════════════════════════ */
+        .details-row {
+          display: flex;
+          gap: 0;
+          padding: 0 28px 14px 28px;
+          margin-bottom: 14px;
+          border-bottom: 1px solid var(--grey-line);
+        }
+        .customer-details {
+          flex: 1.2;
+          background: var(--green-soft);
+          border: 1px solid #c5e0bc;
+          border-radius: 8px 0 0 8px;
+          padding: 12px 18px;
+        }
+        .quotation-details {
+          flex: 1;
+          background: var(--orange-soft);
+          border: 1px solid #f5d9a8;
+          border-radius: 0 8px 8px 0;
+          padding: 12px 18px;
+          border-left: none;
+        }
+        .details-divider { display: none; }
+
+        .section-title-green {
+          font-weight: bold;
+          color: var(--green);
+          font-size: 12.5px;
+          margin-bottom: 9px;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          padding-bottom: 5px;
+          border-bottom: 1.5px solid #c5e0bc;
+        }
+        .section-title-orange {
+          font-weight: bold;
+          color: var(--orange);
+          font-size: 12.5px;
+          margin-bottom: 9px;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          padding-bottom: 5px;
+          border-bottom: 1.5px solid #f5d9a8;
+        }
+        .details-row p {
+          font-size: 12px;
+          margin-bottom: 5px;
+          color: var(--text-dark);
+          line-height: 1.5;
+        }
+        .details-row p span {
+          font-weight: 600;
+          color: var(--text-dark);
+        }
+
+        /* ══════════════════════════════════════════
+           TABLE WRAPPER
+        ══════════════════════════════════════════ */
+        .table-wrap {
+          padding: 0 28px;
+          margin-bottom: 0;
+        }
+
+        /* ── ITEMS TABLE ── */
+        .items-table {
+          width: 100%;
+          border-collapse: collapse;
+          border-radius: 8px;
+          overflow: hidden;
+          box-shadow: 0 2px 12px rgba(26,71,153,0.08);
+        }
+        .items-table thead tr th {
+          background: linear-gradient(135deg, var(--navy-dark) 0%, var(--navy) 100%);
+          color: #fff;
+          font-size: 12px;
+          font-weight: bold;
+          padding: 10px 10px;
+          text-align: center;
+          border-right: 1px solid rgba(255,255,255,0.15);
+          letter-spacing: 0.3px;
+        }
+        .items-table thead tr th:last-child { border-right: none; }
+        .items-table thead tr th:nth-child(2) { text-align: left; }
+        .items-table thead tr th:nth-child(4),
+        .items-table thead tr th:nth-child(6) { text-align: right; }
+
+        .items-table tbody tr td {
+          padding: 8px 10px;
+          font-size: 11.5px;
+          border-bottom: 1px solid var(--grey-line);
+          border-right: 1px solid #eaecf5;
+          text-align: center;
+          color: var(--text-dark);
+        }
+        .items-table tbody tr td:last-child { border-right: none; }
+        .items-table tbody tr td:nth-child(2) { text-align: left; font-weight: 500; }
+        .items-table tbody tr td:nth-child(4),
+        .items-table tbody tr td:nth-child(6) { text-align: right; }
+
+        .items-table tbody tr:nth-child(odd)  { background: var(--white); }
+        .items-table tbody tr:nth-child(even) { background: var(--grey-bg); }
+        .items-table tbody tr:hover           { background: #eef2fc; }
+
+        /* total qty row */
+        .items-table tfoot tr td {
+          padding: 9px 10px;
+          font-size: 12px;
+          font-weight: bold;
+          background: #edf1fb;
+          border-top: 2px solid var(--navy-light);
+          color: var(--text-dark);
+        }
+        .items-table tfoot tr td.tq-label {
+          text-align: right;
+          color: var(--navy);
+        }
+        .items-table tfoot tr td.tq-val {
+          text-align: center;
+          color: var(--navy);
+          font-size: 13px;
+        }
+
+        /* ══════════════════════════════════════════
+           FOOTER — note bottom-left, total+sig bottom-right
+        ══════════════════════════════════════════ */
+        .footer-section {
+          position: relative;
+          margin-top: 18px;
+          padding: 0 28px;
+          display: flex;
+          align-items: flex-end;
+          justify-content: space-between;
+          min-height: 120px;
+        }
+
+        .note-box {
+          width: 35%;
+          flex: 0 0 35%;
+          border: 1px solid #c5e0bc;
+          background: var(--green-soft);
+          border-radius: 8px;
+          padding: 12px 16px;
+          min-height: 90px;
+          align-self: flex-end;
+        }
+        .note-box .note-label {
+          font-weight: bold;
+          font-size: 12.5px;
+          color: var(--green);
+          letter-spacing: 0.3px;
+          display: block;
+          margin-bottom: 6px;
+          padding-bottom: 5px;
+          border-bottom: 1px solid #c5e0bc;
+        }
+
+        .right-block {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-end;
+          gap: 16px;
+        }
+
+        .total-amount-inner {
+          background: linear-gradient(135deg, var(--orange-soft) 0%, #fde8c4 100%);
+          border: 1.5px solid #f5c97a;
+          border-radius: 8px;
+          padding: 12px 20px;
+          text-align: right;
+          min-width: 180px;
+        }
+        .total-label {
+          font-size: 12px;
+          font-weight: bold;
+          color: var(--orange);
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+        .total-value {
+          font-size: 18px;
+          font-weight: bold;
+          color: var(--text-dark);
+          margin-top: 4px;
+        }
+
+        /* ══════════════════════════════════════════
+           SIGNATURE
+        ══════════════════════════════════════════ */
+        .signature-block {
+          width: 200px;
+          text-align: center;
+        }
+        .signature-line {
+          border-bottom: 1.5px solid var(--text-dark);
+          height: 34px;
+        }
+        .signature-label {
+          font-size: 11px;
+          font-weight: bold;
+          color: var(--text-mid);
+          margin-top: 5px;
+          letter-spacing: 0.3px;
+        }
+
+        /* ══════════════════════════════════════════
+           BOTTOM LINE — gradient
+        ══════════════════════════════════════════ */
+        .bottom-line {
+          height: 5px;
+          background: linear-gradient(90deg, var(--navy-dark) 0%, var(--navy) 40%, var(--orange) 100%);
+          margin-top: 20px;
+          border-radius: 0;
+        }
+    </style>
+</head>
+<body>
+
+<!-- TOP BANNER -->
+<div class="top-banner-wrap">
+    <div class="top-banner-left"></div>
+    <div class="top-banner-right">
+        <span><b>Cell :</b> <span th:text="${profile?.phone ?: 'Phone'}"></span></span>
+    </div>
+</div>
+
+<!-- MAIN HEADER -->
+<div class="header-row">
+    <div class="logo-circle">
+        <img th:if="${profile?.logoPath != null}"
+             th:src="@{'/uploads/logos/' + ${profile.logoPath}}" alt="Logo"/>
+        <span th:unless="${profile?.logoPath != null}">[LOGO]</span>
+    </div>
+    <div class="nursery-details">
+        <div class="nursery-name" th:text="${profile?.nurseryName ?: 'NURSERY NAME'}"></div>
+        <div class="nursery-sub">Suppliers : All Varjeties of Fruits, Flower and Ornamental Plants :</div>
+        <div class="nursery-prop">Prop : <span th:text="${profile?.ownerName ?: 'Owner Name'}"></span></div>
+    </div>
+</div>
+
+<!-- ORANGE DIVIDER -->
+<div class="orange-line"></div>
+
+<!-- ADDRESS ROW -->
+<div class="address-row">
+    <span class="addr-text" th:text="${profile?.address ?: 'Address'}"></span>
+    <span class="email-text"><b>Email:</b> <span th:text="${profile?.email ?: 'Email'}"></span></span>
+</div>
+
+<!-- TITLE -->
+<div class="quotation-title-wrap">
+    <div class="quotation-title">QUOTATION</div>
+</div>
+
+<!-- CUSTOMER + QUOTATION DETAILS -->
+<div class="details-row">
+    <div class="customer-details">
+        <div class="section-title-green">Customer Details</div>
+        <p><b>Name :</b> &nbsp;&nbsp;<span th:text="${quotation.customerName ?: '-'}"></span></p>
+        <p><b>Phone :</b> &nbsp;<span th:text="${quotation.customerPhone ?: '-'}"></span></p>
+        <p><b>Address :</b> <span th:text="${quotation.customerAddress ?: '-'}"></span></p>
+    </div>
+    <div class="details-divider"></div>
+    <div class="quotation-details">
+        <div class="section-title-orange">Quotation Details</div>
+        <p><b>Quotation ID :</b> &nbsp;<span th:text="${quotation.quotationNumber ?: '-'}"></span></p>
+        <p><b>Date :</b> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+            <span th:text="${#temporals.format(quotation.createdAt, 'dd/MM/yyyy')}"></span>
+        </p>
+    </div>
+</div>
+
+<!-- ITEMS TABLE -->
+<div class="table-wrap">
+    <table class="items-table">
+        <thead>
+        <tr>
+            <th>ID</th>
+            <th>Plant Name</th>
+            <th>Size</th>
+            <th>Rate</th>
+            <th>Quantity</th>
+            <th>Total</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="item, iterStat : ${quotation.items}">
+            <td th:text="${iterStat.count}"></td>
+            <td th:text="${item.plantName}"></td>
+            <td th:text="${item.dimension ?: '-'}"></td>
+            <td th:text="'Rs.' + ${#numbers.formatDecimal(item.price, 1, 2)}"></td>
+            <td th:text="${item.quantity}"></td>
+            <td th:text="'Rs.' + ${#numbers.formatDecimal(item.itemTotal, 1, 2)}"></td>
+        </tr>
+        </tbody>
+        <tfoot>
+        <tr>
+            <td colspan="4"></td>
+            <td class="tq-label">Total Quantity:</td>
+            <td class="tq-val" th:text="${totalQuantity}"></td>
+        </tr>
+        </tfoot>
+    </table>
+</div>
+
+<!-- FOOTER: Note bottom-left, Total + Signature bottom-right -->
+<div class="footer-section">
+    <div class="note-box">
+        <span class="note-label">Note :</span>
+    </div>
+    <div class="right-block">
+        <div class="total-amount-inner">
+            <div class="total-label">Total Amount :</div>
+            <div class="total-value"
+                 th:text="'Rs.' + ${#numbers.formatDecimal(quotation.totalAmount, 1, 2)}"></div>
+        </div>
+        <div class="signature-block">
+            <div class="signature-line"></div>
+            <div class="signature-label">Authorized Signature</div>
+        </div>
+    </div>
+</div>
+
+<!-- BOTTOM LINE -->
+<div class="bottom-line"></div>
+
+</body>
+</html>

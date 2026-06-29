@@ -9,6 +9,9 @@ import DashboardPage           from './pages/DashboardPage'
 import PlantsPage              from './pages/PlantsPage'
 import QuotationFormPage       from './pages/QuotationFormPage'
 import QuotationDetailPage     from './pages/QuotationDetailPage'
+import InvoiceListPage         from './pages/InvoiceListPage'
+import InvoiceFormPage         from './pages/InvoiceFormPage'
+import InvoiceDetailPage       from './pages/InvoiceDetailPage'
 import SettingsPage            from './pages/SettingsPage'
 import PublicQuotationPage     from './pages/PublicQuotationPage'
 
@@ -40,6 +43,10 @@ export default function App() {
               <Route path="/quotations/new"       element={<QuotationFormPage />} />
               <Route path="/quotations/:id/edit"  element={<QuotationFormPage />} />
               <Route path="/quotations/:id"       element={<QuotationDetailPage />} />
+              <Route path="/invoices"             element={<InvoiceListPage />} />
+              <Route path="/invoices/new"         element={<InvoiceFormPage />} />
+              <Route path="/invoices/:id/edit"    element={<InvoiceFormPage />} />
+              <Route path="/invoices/:id"         element={<InvoiceDetailPage />} />
               <Route path="/settings"             element={<SettingsPage />} />
             </Route>
           </Route>

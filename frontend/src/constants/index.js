@@ -9,6 +9,10 @@ export const ROUTES = {
   QUOTATION_NEW:    '/quotations/new',
   QUOTATION_EDIT:   '/quotations/:id/edit',
   QUOTATION_DETAIL: '/quotations/:id',
+  INVOICES:         '/invoices',
+  INVOICE_NEW:      '/invoices/new',
+  INVOICE_EDIT:     '/invoices/:id/edit',
+  INVOICE_DETAIL:   '/invoices/:id',
   SETTINGS:         '/settings',
   PUBLIC_QUOTATION: '/public/quotations/:token',
 }

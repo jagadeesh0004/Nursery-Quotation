@@ -98,6 +98,25 @@ export const quotationService = {
 }
 
 /**
+ * invoiceService — Handle /invoices endpoints
+ */
+export const invoiceService = {
+  list: (filters) => api.get('/invoices', { params: filters }),
+
+  getOne: (id) => api.get(`/invoices/${id}`),
+
+  create: (data) => api.post('/invoices', data),
+
+  update: (id, data) => api.put(`/invoices/${id}`, data),
+
+  delete: (id) => api.delete(`/invoices/${id}`),
+
+  importFromQuotation: (quotationId) => api.post(`/invoices/from-quotation/${quotationId}`),
+
+  downloadPdf: (id) => api.get(`/invoices/${id}/pdf`, { responseType: 'blob', timeout: 30000 }),
+}
+
+/**
  * publicService — Handle /public/quotations endpoints (no auth required)
  */
 export const publicService = {

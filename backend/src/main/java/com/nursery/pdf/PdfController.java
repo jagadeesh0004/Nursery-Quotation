@@ -10,17 +10,12 @@ import org.springframework.web.bind.annotation.*;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/quotations")
 @RequiredArgsConstructor
 public class PdfController {
 
     private final PdfGenerationService pdfGenerationService;
 
-    /**
-     * GET /api/quotations/{id}/pdf
-     * Downloads the PDF for a quotation (authenticated owner only).
-     */
-    @GetMapping("/{id}/pdf")
+    @GetMapping("/quotations/{id}/pdf")
     public ResponseEntity<byte[]> downloadPdf(@PathVariable Long id) {
         UUID userId = SecurityUtils.getCurrentUserId();
         byte[] pdfBytes = pdfGenerationService.generateForQuotation(userId, id);
@@ -29,6 +24,18 @@ public class PdfController {
                 .contentType(MediaType.APPLICATION_PDF)
                 .header(HttpHeaders.CONTENT_DISPOSITION,
                         "attachment; filename=\"quotation-" + id + ".pdf\"")
+                .body(pdfBytes);
+    }
+
+    @GetMapping("/invoices/{id}/pdf")
+    public ResponseEntity<byte[]> downloadInvoicePdf(@PathVariable Long id) {
+        UUID userId = SecurityUtils.getCurrentUserId();
+        byte[] pdfBytes = pdfGenerationService.generateForInvoice(userId, id);
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_PDF)
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"invoice-" + id + ".pdf\"")
                 .body(pdfBytes);
     }
 }

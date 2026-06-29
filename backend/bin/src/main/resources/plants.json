@@ -1,0 +1,111 @@
+[
+  {"plant_name": "Neem", "bag_sizes": ["8x10", "13x13", "21x21"]},
+  {"plant_name": "Cassia fistula", "bag_sizes": ["8x10", "21x21"]},
+  {"plant_name": "Cassia siamea", "bag_sizes": ["21x21"]},
+  {"plant_name": "Cassia javanica", "bag_sizes": ["21x21"]},
+
+  {"plant_name": "Custard Apple", "bag_sizes": ["8x10", "13x13", "21x21"]},
+  {"plant_name": "Papaya", "bag_sizes": ["8x10"]},
+  {"plant_name": "Guava", "bag_sizes": ["13x13"]},
+  {"plant_name": "Banana", "bag_sizes": ["8x10"]},
+  {"plant_name": "Pomegranate", "bag_sizes": ["8x10"]},
+  {"plant_name": "Mango", "bag_sizes": []},
+  {"plant_name": "Amla", "bag_sizes": ["13x13"]},
+  {"plant_name": "Shikakai", "bag_sizes": []},
+  {"plant_name": "Indian Plum (Ber)", "bag_sizes": ["13x13"]},
+  {"plant_name": "Pear Tree", "bag_sizes": ["13x13"]},
+
+  {"plant_name": "Coconut Tree", "bag_sizes": []},
+  {"plant_name": "Jackfruit Tree", "bag_sizes": []},
+
+  {"plant_name": "Areca Palm", "bag_sizes": ["8x10", "12x13", "15x16", "21x21"]},
+  {"plant_name": "Foxtail Palm", "bag_sizes": ["13x13", "18x18", "21x21"]},
+  {"plant_name": "Royal Palm", "bag_sizes": ["21x21"]},
+  {"plant_name": "Veitchia merrillii", "bag_sizes": ["21x21"]},
+  {"plant_name": "Raphis Palm", "bag_sizes": ["13x13"]},
+
+  {"plant_name": "Ficus Panda", "bag_sizes": ["18x18", "21x21"]},
+  {"plant_name": "Ficus lyrata", "bag_sizes": ["30x30"]},
+  {"plant_name": "Ficus religiosa (Peepal)", "bag_sizes": ["21x21"]},
+  {"plant_name": "Ficus benghalensis (Banyan)", "bag_sizes": ["21x21"]},
+  {"plant_name": "Ficus benjamina", "bag_sizes": ["25x25"]},
+
+  {"plant_name": "Banyan Tree", "bag_sizes": ["21x21"]},
+  {"plant_name": "Peepal Tree", "bag_sizes": ["21x21"]},
+  {"plant_name": "Arjuna Tree", "bag_sizes": ["21x21", "25x25"]},
+  {"plant_name": "Terminalia arjuna", "bag_sizes": ["25x25"]},
+  {"plant_name": "Terminalia mantaly", "bag_sizes": ["21x21"]},
+  {"plant_name": "Terminalia bellirica", "bag_sizes": ["21x21"]},
+  {"plant_name": "Terminalia catappa", "bag_sizes": ["25x25"]},
+  {"plant_name": "Terminalia bentizoe", "bag_sizes": ["25x25"]},
+
+  {"plant_name": "Rain Tree", "bag_sizes": ["21x21"]},
+  {"plant_name": "Kadamba Tree", "bag_sizes": ["13x13", "21x21", "25x25"]},
+  {"plant_name": "Mahua Tree", "bag_sizes": ["21x21"]},
+  {"plant_name": "Siris", "bag_sizes": ["21x21"]},
+  {"plant_name": "Indian Elm", "bag_sizes": []},
+  {"plant_name": "Putranjiva roxburghii", "bag_sizes": ["21x21"]},
+
+  {"plant_name": "Kigelia pinnata (Sausage Tree)", "bag_sizes": ["21x21"]},
+  {"plant_name": "Bombax ceiba", "bag_sizes": ["21x21"]},
+  {"plant_name": "Semal", "bag_sizes": []},
+  {"plant_name": "Babul", "bag_sizes": []},
+  {"plant_name": "Shisham", "bag_sizes": []},
+
+  {"plant_name": "Tabebuia rosea", "bag_sizes": ["21x21", "25x25"]},
+  {"plant_name": "Tabebuia argentea", "bag_sizes": ["25x25"]},
+  {"plant_name": "Spathodea campanulata", "bag_sizes": ["25x25", "50x50"]},
+  {"plant_name": "Lagerstroemia", "bag_sizes": ["30x30"]},
+  {"plant_name": "Lagerstroemia speciosa", "bag_sizes": ["30x30"]},
+  {"plant_name": "Gulmohar Yellow", "bag_sizes": ["40x40"]},
+  {"plant_name": "Parijatak", "bag_sizes": ["30x30"]},
+
+  {"plant_name": "Plumeria", "bag_sizes": ["18x18", "21x21", "30x30"]},
+  {"plant_name": "Vrundavan Champa", "bag_sizes": ["25x25"]},
+  {"plant_name": "Pong Pong Champa", "bag_sizes": ["21x21"]},
+
+  {"plant_name": "Hibiscus", "bag_sizes": ["9x11", "25x25"]},
+  {"plant_name": "Hibiscus variegated", "bag_sizes": ["13x13"]},
+  {"plant_name": "Ixora", "bag_sizes": ["9x11", "13x13"]},
+  {"plant_name": "Jatropha", "bag_sizes": ["13x13"]},
+  {"plant_name": "Canna", "bag_sizes": ["13x13"]},
+  {"plant_name": "Allamanda", "bag_sizes": ["13x13"]},
+  {"plant_name": "Turnera ulmifolia", "bag_sizes": ["13x13"]},
+  {"plant_name": "Cestrum nocturnum (Night Queen)", "bag_sizes": ["7x8"]},
+
+  {"plant_name": "Dracaena", "bag_sizes": ["8x10", "15x16"]},
+  {"plant_name": "Dracaena Mahatma", "bag_sizes": ["15x16"]},
+  {"plant_name": "Dracaena Colorama", "bag_sizes": ["8x10"]},
+
+  {"plant_name": "Heliconia", "bag_sizes": ["13x13"]},
+  {"plant_name": "Heliconia rostrata", "bag_sizes": ["13x13"]},
+  {"plant_name": "Heliconia psittacorum", "bag_sizes": ["13x13"]},
+
+  {"plant_name": "Zamia", "bag_sizes": ["15x16", "18x18"]},
+  {"plant_name": "Sansevieria", "bag_sizes": ["pot"]},
+  {"plant_name": "Spathiphyllum", "bag_sizes": ["pot"]},
+  {"plant_name": "Syngonium", "bag_sizes": ["pot"]},
+  {"plant_name": "Coleus", "bag_sizes": ["pot"]},
+
+  {"plant_name": "Pandanus", "bag_sizes": ["8x10", "13x13"]},
+  {"plant_name": "Rhoeo spathacea", "bag_sizes": ["8x10"]},
+  {"plant_name": "Asparagus", "bag_sizes": ["13x13"]},
+  {"plant_name": "Dianella", "bag_sizes": ["10x11", "13x13"]},
+  {"plant_name": "Wedelia trilobata", "bag_sizes": ["8x8"]},
+  {"plant_name": "Fountain Grass", "bag_sizes": ["8x8", "13x13"]},
+
+  {"plant_name": "Dragon Fruit", "bag_sizes": ["13x13"]},
+  {"plant_name": "Star Fruit", "bag_sizes": ["21x21"]},
+  {"plant_name": "Beal (Aegle marmelos)", "bag_sizes": ["21x21"]},
+
+  {"plant_name": "Cannonball Tree", "bag_sizes": ["25x25"]},
+  {"plant_name": "Khaya", "bag_sizes": ["30x30"]},
+  {"plant_name": "Kusum", "bag_sizes": ["25x25"]},
+  {"plant_name": "Badoli Jamun", "bag_sizes": ["30x30"]},
+
+  {"plant_name": "Chandan Tree", "bag_sizes": ["21x21"]},
+  {"plant_name": "Bauhinia blakeana", "bag_sizes": ["21x21"]},
+  {"plant_name": "Erythrina indica picta", "bag_sizes": ["13x13"]},
+  {"plant_name": "Billipatra", "bag_sizes": ["15x16"]}
+]
+

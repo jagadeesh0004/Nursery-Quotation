@@ -7,10 +7,10 @@
  */
 import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Download, Share2, Edit2, Copy, Trash2, MapPin, Phone, User, CheckCircle, Clock } from 'lucide-react'
+import { ArrowLeft, Download, Share2, Edit2, Copy, Trash2, MapPin, Phone, User, CheckCircle, Clock, FilePlus } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useAuth } from '../context/AuthContext'
-import { quotationService } from '../services'
+import { quotationService, invoiceService } from '../services'
 import { Button, Badge, Skeleton, ConfirmDialog, Card } from '../components/ui'
 import { formatCurrency, formatDate, downloadBlob, getError, formatQuotationId } from '../utils'
 
@@ -23,6 +23,7 @@ export default function QuotationDetailPage() {
   const [loading,     setLoading]     = useState(true)
   const [pdfLoading,  setPdfLoading]  = useState(false)
   const [dupeLoading, setDupeLoading] = useState(false)
+  const [createLoading, setCreateLoading] = useState(false)
   const [showDelete,  setShowDelete]  = useState(false)
 
   useEffect(() => {
@@ -65,6 +66,18 @@ export default function QuotationDetailPage() {
       if (message) toast.error(message)
     }
     finally { setDupeLoading(false) }
+  }
+
+  async function handleCreateInvoice() {
+    setCreateLoading(true)
+    try {
+      const res = await invoiceService.importFromQuotation(id)
+      toast.success('Invoice created from quotation')
+      navigate(`/invoices/${res.data.data?.id}`)
+    } catch (err) {
+      const message = getError(err)
+      if (message) toast.error(message)
+    } finally { setCreateLoading(false) }
   }
 
   async function handleDelete() {
@@ -186,6 +199,7 @@ export default function QuotationDetailPage() {
       <div className="flex flex-wrap items-center gap-2.5">
         {!isFinal && <Button variant="secondary" className="flex-1 sm:flex-none justify-center" onClick={() => navigate(`/quotations/${id}/edit`)}><Edit2 className="w-3.5 h-3.5" />Edit</Button>}
         <Button variant="secondary" className="flex-1 sm:flex-none justify-center" onClick={handleDuplicate} loading={dupeLoading}><Copy className="w-3.5 h-3.5" />Duplicate</Button>
+        <Button variant="secondary" className="flex-1 sm:flex-none justify-center" onClick={handleCreateInvoice} loading={createLoading}><FilePlus className="w-3.5 h-3.5" />Create Invoice</Button>
         <Button variant="ghost" className="w-full sm:w-auto justify-center text-red-500 hover:bg-red-100 hover:text-red-700 sm:ml-auto" onClick={() => setShowDelete(true)}>
           <Trash2 className="w-4 h-4" />Delete
         </Button>

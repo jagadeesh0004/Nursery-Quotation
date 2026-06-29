@@ -4,13 +4,14 @@
  */
 import { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, Leaf, Settings, LogOut, Menu, X, Sprout } from 'lucide-react'
+import { LayoutDashboard, Leaf, Settings, Menu, X, Sprout, ReceiptText } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { getInitials, cx } from '../../utils'
 import toast from 'react-hot-toast'
 
 const NAV = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/invoices',  icon: ReceiptText,     label: 'Invoices' },
   { to: '/plants',    icon: Leaf,            label: 'Plants Master' },
   { to: '/settings',  icon: Settings,        label: 'Settings' },
 ]
