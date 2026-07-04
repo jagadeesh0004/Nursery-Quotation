@@ -58,6 +58,8 @@ public class QuotationService {
                 .customerName(request.customerName())
                 .customerPhone(request.customerPhone())
                 .customerAddress(request.customerAddress())
+                .notes(request.notes())
+                .heightEnabled(Boolean.TRUE.equals(request.heightEnabled()))
                 .year(Year.now().getValue())
                 .build();
 
@@ -121,6 +123,8 @@ public class QuotationService {
         quotation.setCustomerName(request.customerName());
         quotation.setCustomerPhone(request.customerPhone());
         quotation.setCustomerAddress(request.customerAddress());
+        quotation.setNotes(request.notes());
+        quotation.setHeightEnabled(Boolean.TRUE.equals(request.heightEnabled()));
 
         if (request.items() != null) {
             quotation.getItems().clear();
@@ -159,6 +163,8 @@ public class QuotationService {
         if (request.customerName() != null)    quotation.setCustomerName(request.customerName());
         if (request.customerPhone() != null)   quotation.setCustomerPhone(request.customerPhone());
         if (request.customerAddress() != null) quotation.setCustomerAddress(request.customerAddress());
+        if (request.notes() != null)           quotation.setNotes(request.notes());
+        if (request.heightEnabled() != null)   quotation.setHeightEnabled(request.heightEnabled());
 
         if (request.items() != null && !request.items().isEmpty()) {
             quotation.getItems().clear();
@@ -197,6 +203,8 @@ public class QuotationService {
                 .customerName(source.getCustomerName())
                 .customerPhone(source.getCustomerPhone())
                 .customerAddress(source.getCustomerAddress())
+                .notes(source.getNotes())
+                .heightEnabled(source.isHeightEnabled())
                 .year(Year.now().getValue())
                 .totalAmount(source.getTotalAmount())
                 .build();
@@ -206,6 +214,7 @@ public class QuotationService {
                         .quotation(copy)
                         .plantName(item.getPlantName())
                         .dimension(item.getDimension())
+                    .height(item.getHeight())
                         .quantity(item.getQuantity())
                         .price(item.getPrice())
                         .itemTotal(item.getItemTotal())
@@ -245,10 +254,22 @@ public class QuotationService {
             // Dynamic plant + dimension creation
             plantService.findOrCreatePlantWithDimension(userId, req.plantName(), req.dimension());
 
+            String height = null;
+            if (quotation.isHeightEnabled()) {
+                if (req.height() == null || req.height().isBlank()) {
+                    throw new BusinessException("Height is required when height is enabled for the quotation.");
+                }
+                if (!isValidHeightFormat(req.height())) {
+                    throw new BusinessException("Height must be like 6 inch, 6 ft, 6 feet, or 6'.");
+                }
+                height = normalizeHeight(req.height());
+            }
+
             QuotationItem item = QuotationItem.builder()
                     .quotation(quotation)
                     .plantName(req.plantName().trim())
                     .dimension(req.dimension().trim())
+                    .height(height)
                     .quantity(req.quantity())
                     .price(req.price())
                     .itemTotal(calculationEngine.calculateItemTotal(req.price(), req.quantity()))
@@ -286,6 +307,18 @@ public class QuotationService {
         }
     }
 
+    private boolean isValidHeightFormat(String height) {
+        if (height == null) return false;
+        String trimmed = height.trim();
+        if (trimmed.isEmpty()) return false;
+
+        return trimmed.matches("(?i)^(?:\\d+(?:\\.\\d+)?\\s*(?:in|inch(?:es)?|ft|feet|foot|')|\\d+'\\s*\\d+\\\"?)$");
+    }
+
+    private String normalizeHeight(String height) {
+        return height == null ? null : height.trim().replaceAll("\\s+", " ");
+    }
+
     private Quotation findOwnedQuotation(UUID userId, Long quotationId) {
         return quotationRepository.findByIdAndUserId(quotationId, userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Quotation", quotationId));
@@ -321,6 +354,8 @@ public class QuotationService {
                 baseResponse.customerName(),
                 baseResponse.customerPhone(),
                 baseResponse.customerAddress(),
+                baseResponse.notes(),
+            baseResponse.heightEnabled(),
                 profile != null ? profile.getNurseryName() : null,
                 profile != null ? profile.getAddress() : null,
                 profile != null ? profile.getPhone() : null,

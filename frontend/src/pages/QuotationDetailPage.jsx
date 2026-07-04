@@ -12,7 +12,8 @@ import toast from 'react-hot-toast'
 import { useAuth } from '../context/AuthContext'
 import { quotationService, invoiceService } from '../services'
 import { Button, Badge, Skeleton, ConfirmDialog, Card } from '../components/ui'
-import { formatCurrency, formatDate, downloadBlob, getError, formatQuotationId } from '../utils'
+import { formatCurrency, formatNumber, formatDate, downloadBlob, getError, formatQuotationId } from '../utils'
+import { getUnitWeightFromDimension, formatWeight } from '../constants/weightMapping'
 
 export default function QuotationDetailPage() {
   const { id } = useParams()
@@ -103,8 +104,14 @@ export default function QuotationDetailPage() {
   const q       = quotation
   const isFinal = q.status === 'FINAL'
   const displayNurseryName = q.nurseryName || profile?.nurseryName || 'Your Nursery'
-   const formattedId = q.quotationNumber || '-'
+  const formattedId = q.quotationNumber || '-'
+  const showHeight = Boolean(q.heightEnabled)
   const totalQuantity = (q.items || []).reduce((sum, it) => sum + (parseInt(it.quantity) || 0), 0)
+  const totalNetWeight = (q.items || []).reduce((sum, it) => {
+    const qty = parseInt(it.quantity) || 0
+    const unit = getUnitWeightFromDimension(it.dimension)
+    return sum + unit * qty
+  }, 0)
 
   return (
     <div className="animate-fade-up max-w-3xl">
@@ -153,16 +160,24 @@ export default function QuotationDetailPage() {
           </div>
         </div>
 
+        {q.notes && (
+          <div className="px-4 sm:px-6 py-4 border-b border-gray-100 bg-white">
+            <p className="text-[11px] font-bold text-muted uppercase tracking-widest mb-2">Notes</p>
+            <p className="text-sm text-muted leading-relaxed whitespace-pre-line">{q.notes}</p>
+          </div>
+        )}
+
         {/* Table */}
         <div className="overflow-x-auto border-x border-gray-200">
-          <table className="w-full min-w-[600px] sm:min-w-max border-collapse">
+          <table className={`w-full border-collapse ${showHeight ? 'min-w-[720px]' : 'min-w-[600px]'} sm:min-w-max`}>
             <thead>
               <tr className="bg-[#5CB338]">
                 <th className="border border-[#4a912e] px-3 sm:px-5 py-3 text-[11px] font-semibold text-white/90 uppercase tracking-widest text-left">ID</th>
                 <th className="border border-[#4a912e] px-3 sm:px-5 py-3 text-[11px] font-semibold text-white/90 uppercase tracking-widest text-left">Plant Name</th>
                  <th className="border border-[#4a912e] px-3 sm:px-5 py-3 text-[11px] font-semibold text-white/90 uppercase tracking-widest text-left whitespace-nowrap">Bag / Pot Size</th>
+                {showHeight && <th className="border border-[#4a912e] px-3 sm:px-5 py-3 text-[11px] font-semibold text-white/90 uppercase tracking-widest text-left whitespace-nowrap">Height</th>}
                 <th className="border border-[#4a912e] px-3 sm:px-5 py-3 text-[11px] font-semibold text-white/90 uppercase tracking-widest text-right">Qty</th>
-                <th className="border border-[#4a912e] px-3 sm:px-5 py-3 text-[11px] font-semibold text-white/90 uppercase tracking-widest text-right">Price/Pc</th>
+                <th className="border border-[#4a912e] px-3 sm:px-5 py-3 text-[11px] font-semibold text-white/90 uppercase tracking-widest text-right">Rate</th>
                 <th className="border border-[#4a912e] px-3 sm:px-5 py-3 text-[11px] font-semibold text-white/90 uppercase tracking-widest text-right">Total</th>
               </tr>
             </thead>
@@ -172,9 +187,10 @@ export default function QuotationDetailPage() {
                   <td className="border border-gray-200 px-3 sm:px-5 py-3.5 text-sm text-muted font-mono">{i + 1}</td>
                   <td className="border border-gray-200 px-3 sm:px-5 py-3.5 text-sm font-semibold text-ink break-words min-w-[100px]">{item.plantName}</td>
                   <td className="border border-gray-200 px-3 sm:px-5 py-3.5 text-sm text-muted whitespace-nowrap">{item.dimension || '-'}</td>
+                  {showHeight && <td className="border border-gray-200 px-3 sm:px-5 py-3.5 text-sm text-muted whitespace-nowrap">{item.height || '-'}</td>}
                   <td className="border border-gray-200 px-3 sm:px-5 py-3.5 text-sm text-right text-muted font-mono">{item.quantity}</td>
                   <td className="border border-gray-200 px-3 sm:px-5 py-3.5 text-sm text-right text-muted font-mono">{formatCurrency(item.price)}</td>
-                  <td className="border border-gray-200 px-3 sm:px-5 py-3.5 text-sm text-right font-bold text-[#5CB338] font-mono">{formatCurrency(item.price * item.quantity)}</td>
+                  <td className="border border-gray-200 px-3 sm:px-5 py-3.5 text-sm text-right font-bold text-[#5CB338] font-mono">{formatNumber(item.price * item.quantity)}</td>
                 </tr>
               ))}
             </tbody>
@@ -183,9 +199,15 @@ export default function QuotationDetailPage() {
 
         {/* Grand total */}
         <div className="flex flex-col sm:flex-row justify-end items-end sm:items-center gap-3 sm:gap-8 px-4 sm:px-6 py-4 sm:py-5 border-t border-gray-100 bg-gray-50/50">
-          <div className="flex items-center gap-3">
-            <span className="text-sm font-semibold text-muted uppercase tracking-widest">Total Qty</span>
-            <span className="text-xl font-bold text-ink font-mono">{totalQuantity}</span>
+          <div className="flex flex-col">
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-semibold text-muted uppercase tracking-widest">Total Qty</span>
+              <span className="text-xl font-bold text-ink font-mono">{totalQuantity}</span>
+            </div>
+            <div className="flex items-center gap-3 mt-1">
+              <span className="text-sm font-semibold text-muted uppercase tracking-widest">Net Weight</span>
+              <span className="text-xl font-bold text-ink font-mono">{formatWeight(totalNetWeight)}</span>
+            </div>
           </div>
           <div className="hidden sm:block w-px h-8 bg-gray-200"></div>
           <div className="flex items-center gap-3">

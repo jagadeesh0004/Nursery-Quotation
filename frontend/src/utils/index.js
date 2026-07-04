@@ -5,6 +5,10 @@ import { errorMapper } from '../services'
 export const formatCurrency = (amount) =>
   `Rs ${Number(amount || 0).toLocaleString('en-IN')}`
 
+// Number formatter without currency symbol (e.g., per-plant totals)
+export const formatNumber = (amount) =>
+  `${Number(amount || 0).toLocaleString('en-IN')}`
+
 // Date formatter
 export const formatDate = (date) => {
   if (!date) return '—'

@@ -50,6 +50,13 @@ public class Quotation extends BaseAuditEntity {
     @Column(name = "customer_address")
     private String customerAddress;
 
+    @Column(name = "notes", columnDefinition = "text")
+    private String notes;
+
+    @Column(name = "height_enabled", nullable = false)
+    @Builder.Default
+    private boolean heightEnabled = false;
+
     @Column(name = "total_amount", nullable = false)
     @Builder.Default
     private BigDecimal totalAmount = BigDecimal.ZERO;

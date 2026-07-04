@@ -162,6 +162,12 @@
             <artifactId>spring-security-test</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- WebP ImageIO support (allows ImageIO to read WebP and convert to PNG) -->
+        <dependency>
+            <groupId>com.twelvemonkeys.imageio</groupId>
+            <artifactId>imageio-webp</artifactId>
+            <version>3.8.2</version>
+        </dependency>
     </dependencies>
 
     <build>

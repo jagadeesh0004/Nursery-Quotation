@@ -20,8 +20,8 @@ public class PlantDtos {
      public record AddDimensionRequest(
              @NotBlank(message = "Dimension is required")
                  @Pattern(
-                     regexp = "(^\\d+\\s*[xX]\\s*\\d+$)|(^[Pp]ot$)|(^\\d+\"\\s*[Pp]ot$)",
-                     message = "Dimension must be a bag size (number x number) or a pot size (pot or number\" pot, e.g., 12\" pot)"
+                                         regexp = "(^\\d+\\s*[xX]\\s*\\d+$)|(^[Pp]ot$)|(^\\d+\"\\s*[Pp]ot$)|(^\\d+\\s*[Kk][Gg](s)?$)",
+                                         message = "Dimension must be a bag size (number x number), a weight size (number kg/kgs), or a pot size (pot or number\" pot)"
                  )
              @Size(max = 20, message = "Dimension must not exceed 20 characters")
              String dimension,
