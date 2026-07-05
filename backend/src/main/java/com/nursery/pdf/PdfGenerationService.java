@@ -456,20 +456,65 @@ public class PdfGenerationService {
      * change per render. Keeping this as a single method - rather than duplicating the CSS in
      * two builder methods - is what keeps the Quotation and Invoice layouts identical.
      */
-    private String buildStyleSheet(PdfTheme theme) {
-    return "body { margin:0; padding:0; "
-            + "font-family:'" + UNICODE_FONT_FAMILY + "', 'Helvetica Neue', Helvetica, Arial, sans-serif; "
-            + "font-size:12px; color:" + TEXT_PRIMARY + "; background:#fff; }"
-            + "@page { size: A4; margin: 20px " + PAGE_SIDE_MARGIN + "; padding: 0; }"
-            + "* { margin: 0; padding: 0; }"
-            + "table { page-break-inside: auto; margin: 0; border-collapse: collapse; }"
-            + "tr { page-break-inside: avoid; page-break-after: auto; }"
-            + "thead { display: table-header-group; }"
-            + "tfoot { display: table-footer-group; }"
-            + "div { margin:0; padding:0; }"
-            + "#footer { text-align:center; padding:20px 0; border-top:1px solid "
-            + FOOTER_BORDER + "; color:" + TEXT_MUTED
-            + "; font-size:11px; margin-top:20px; page-break-inside:avoid; }";
+   private String buildStyleSheet(PdfTheme theme) {
+
+    return "@font-face {"
+            + "font-family:'NotoSansTelugu';"
+            + "src:url(data:font/truetype;base64,"
+            + NOTO_TELUGU_BASE64
+            + ") format('truetype');"
+            + "font-weight:normal;"
+            + "font-style:normal;"
+            + "}"
+
+            + "body {"
+            + "margin:0;"
+            + "padding:0;"
+            + "font-family:'NotoSansTelugu','Helvetica Neue',Helvetica,Arial,sans-serif;"
+            + "font-size:12px;"
+            + "color:" + TEXT_PRIMARY + ";"
+            + "background:#fff;"
+            + "}"
+
+            + "@page {"
+            + "size:A4;"
+            + "margin:20px " + PAGE_SIDE_MARGIN + ";"
+            + "padding:0;"
+            + "}"
+
+            + "* {"
+            + "margin:0;"
+            + "padding:0;"
+            + "}"
+
+            + "table {"
+            + "page-break-inside:auto;"
+            + "margin:0;"
+            + "border-collapse:collapse;"
+            + "}"
+
+            + "tr {"
+            + "page-break-inside:avoid;"
+            + "page-break-after:auto;"
+            + "}"
+
+            + "thead { display:table-header-group; }"
+            + "tfoot { display:table-footer-group; }"
+
+            + "div {"
+            + "margin:0;"
+            + "padding:0;"
+            + "}"
+
+            + "#footer {"
+            + "text-align:center;"
+            + "padding:20px 0;"
+            + "border-top:1px solid " + FOOTER_BORDER + ";"
+            + "color:" + TEXT_MUTED + ";"
+            + "font-size:11px;"
+            + "margin-top:20px;"
+            + "page-break-inside:avoid;"
+            + "}";
 }
 
     // ------------------------------------------------------------------
