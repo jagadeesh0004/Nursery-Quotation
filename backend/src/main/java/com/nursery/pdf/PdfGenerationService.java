@@ -69,6 +69,7 @@ public class PdfGenerationService {
     private final QuotationRepository quotationRepository;
     private final InvoiceRepository invoiceRepository;
     private final NurseryProfileRepository profileRepository;
+    private final ChromiumPdfService chromiumPdfService;
 
     // ------------------------------------------------------------------
     // Formatting constants
@@ -185,17 +186,12 @@ public class PdfGenerationService {
     // ==================================================================
 
     private byte[] renderPdf(String html, String failureMessage) {
-        try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
-            ITextRenderer renderer = new ITextRenderer();
-            registerUnicodeFont(renderer);
-            renderer.setDocumentFromString(html, null);
-            renderer.layout();
-            renderer.createPDF(out);
-            return out.toByteArray();
-        } catch (Exception e) {
-            throw new RuntimeException(failureMessage, e);
-        }
+    try {
+        return chromiumPdfService.generatePdf(html);
+    } catch (Exception e) {
+        throw new RuntimeException(failureMessage, e);
     }
+}
 
     /**
      * Registers the embedded Unicode font with Flying Saucer's font resolver so that Telugu
@@ -462,7 +458,7 @@ public class PdfGenerationService {
         // class-based shorthand "border" losing to an inline "border-left:none"), so every
         // color/border/spacing rule below is applied inline at the point of use instead.
         return "body { margin:0; padding:0; "
-                + "font-family:'" + UNICODE_FONT_FAMILY + "', 'Helvetica Neue', Helvetica, Arial, sans-serif; "
+                + "font-family:'Segoe UI', 'Helvetica Neue', Helvetica, Arial, '" + UNICODE_FONT_FAMILY + "', sans-serif; "
                 + "font-size:12px; color:" + TEXT_PRIMARY + "; background:#fff; }"
                 + "@page { size: A4; margin: 20px " + PAGE_SIDE_MARGIN + "; padding: 0; }"
                 + "* { margin: 0; padding: 0; }"
@@ -531,15 +527,15 @@ public class PdfGenerationService {
     private String buildHeader(DocumentContext ctx) {
         StringBuilder sb = new StringBuilder();
         sb.append("<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" ")
-                .append("style=\"padding:24px 0 16px 0")
+                .append("style=\"padding:24px 0 22px 0")
                 .append("; border-bottom:1px solid ").append(FOOTER_BORDER).append("; page-break-inside:avoid;\">");
         sb.append("<tr>");
         sb.append("<td width=\"100\" valign=\"top\" style=\"padding-right:16px;text-align:left;\">")
                 .append(ctx.logoTag).append("</td>");
         sb.append("<td valign=\"top\" style=\"text-align:left; padding-top:4px;\">");
-        sb.append("<div style=\"font-size:26px; font-weight:800; color:").append(ctx.theme.primary())
+        sb.append("<div style=\"font-size:28px; font-weight:700; letter-spacing:0.2px; color:").append(ctx.theme.primary())
                 .append("; margin-bottom:6px;\">").append(ctx.nurseryName).append("</div>");
-        sb.append("<div style=\"font-size:12px; margin-bottom:6px; ").append(mutedStyle()).append("\">")
+        sb.append("<div style=\"font-size:13px; line-height:1.4; margin-bottom:6px; ").append(mutedStyle()).append("\">")
                 .append("All Varieties of Fruits, Flowers &amp; Ornamental Plants</div>");
         sb.append("<div style=\"font-size:12px;\">").append(ctx.address).append("</div>");
         sb.append("</td>");
@@ -548,7 +544,7 @@ public class PdfGenerationService {
         sb.append(headerContactRow("Proprietor:", ctx.ownerName));
         sb.append(headerContactRow("Tel:", ctx.phone));
         sb.append("<tr><td style=\"font-size:12px; padding-right:8px; ").append(mutedStyle()).append("\">Email:</td>")
-                .append("<td style=\"font-size:12px; font-weight:bold;\">").append(ctx.email).append("</td></tr>");
+                .append("<td style=\"font-size:12px;line-height:1.5; font-weight:600;\">").append(ctx.email).append("</td></tr>");
         sb.append("</table>");
         sb.append("</td>");
         sb.append("</tr></table>");

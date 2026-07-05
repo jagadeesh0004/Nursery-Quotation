@@ -8,15 +8,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 
-/**
- * ✅ FIX #2: Input Validation Added
- *
- * Prevents:
- * - SQL injection via plant names
- * - Invalid quantities/prices
- * - Buffer overflow with long strings
- * - Data integrity issues
- */
+
 @Entity
 @Table(name = "quotation_items")
 @Getter
@@ -62,7 +54,7 @@ public class QuotationItem {
 
     @NotNull(message = "Item total is required")
     @DecimalMin(value = "0.01", message = "Item total must be greater than 0")
-    @DecimalMax(value = "999999.99", message = "Item total cannot exceed 999999.99")
+    @DecimalMax(value = "9999999.99", message = "Item total cannot exceed 9999999.99")
     @Column(name = "item_total", nullable = false)
     private BigDecimal itemTotal;
 

@@ -110,6 +110,12 @@
             <version>9.1.22</version>
         </dependency>
 
+        <dependency>
+    <groupId>com.microsoft.playwright</groupId>
+    <artifactId>playwright</artifactId>
+    <version>1.54.0</version>
+</dependency>
+
         <!-- OpenPDF (transitive, but pin the version explicitly) -->
         <dependency>
             <groupId>com.github.librepdf</groupId>
