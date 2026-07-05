@@ -71,6 +71,10 @@ public class PdfGenerationService {
     private final NurseryProfileRepository profileRepository;
     private final ChromiumPdfService chromiumPdfService;
 
+
+    private static final String NOTO_TELUGU_BASE64 =
+        FontUtil.loadFontAsBase64("fonts/NotoSansTelugu-Regular.ttf");
+
     // ------------------------------------------------------------------
     // Formatting constants
     // ------------------------------------------------------------------
@@ -453,24 +457,20 @@ public class PdfGenerationService {
      * two builder methods - is what keeps the Quotation and Invoice layouts identical.
      */
     private String buildStyleSheet(PdfTheme theme) {
-        // Deliberately limited to tag/id selectors. Flying Saucer's CSS cascade does not
-        // reliably resolve custom classes layered under per-cell inline overrides (e.g. a
-        // class-based shorthand "border" losing to an inline "border-left:none"), so every
-        // color/border/spacing rule below is applied inline at the point of use instead.
-        return "body { margin:0; padding:0; "
-                + "font-family:'Segoe UI', 'Helvetica Neue', Helvetica, Arial, '" + UNICODE_FONT_FAMILY + "', sans-serif; "
-                + "font-size:12px; color:" + TEXT_PRIMARY + "; background:#fff; }"
-                + "@page { size: A4; margin: 20px " + PAGE_SIDE_MARGIN + "; padding: 0; }"
-                + "* { margin: 0; padding: 0; }"
-                // Tables flow across pages; individual rows never split, header repeats on every page.
-                + "table { page-break-inside: auto; margin: 0; border-collapse: collapse; }"
-                + "tr { page-break-inside: avoid; page-break-after: auto; }"
-                + "thead { display: table-header-group; }"
-                + "tfoot { display: table-footer-group; }"
-                + "div { margin:0; padding:0; }"
-                + "#footer { text-align:center; padding:20px 0; border-top:1px solid "
-                + FOOTER_BORDER + "; color:" + TEXT_MUTED + "; font-size:11px; margin-top:20px; page-break-inside:avoid; }";
-    }
+    return "body { margin:0; padding:0; "
+            + "font-family:'" + UNICODE_FONT_FAMILY + "', 'Helvetica Neue', Helvetica, Arial, sans-serif; "
+            + "font-size:12px; color:" + TEXT_PRIMARY + "; background:#fff; }"
+            + "@page { size: A4; margin: 20px " + PAGE_SIDE_MARGIN + "; padding: 0; }"
+            + "* { margin: 0; padding: 0; }"
+            + "table { page-break-inside: auto; margin: 0; border-collapse: collapse; }"
+            + "tr { page-break-inside: avoid; page-break-after: auto; }"
+            + "thead { display: table-header-group; }"
+            + "tfoot { display: table-footer-group; }"
+            + "div { margin:0; padding:0; }"
+            + "#footer { text-align:center; padding:20px 0; border-top:1px solid "
+            + FOOTER_BORDER + "; color:" + TEXT_MUTED
+            + "; font-size:11px; margin-top:20px; page-break-inside:avoid; }";
+}
 
     // ------------------------------------------------------------------
     // Shared inline-style fragments
