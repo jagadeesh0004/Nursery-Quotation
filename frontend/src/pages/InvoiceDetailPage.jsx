@@ -63,7 +63,8 @@ export default function InvoiceDetailPage() {
   const q       = invoice
   const isFinal = q.status === 'FINAL'
   const displayNurseryName = q.nurseryName || profile?.nurseryName || 'Your Nursery'
-   const formattedId = q.invoiceNumber || '-'
+  const formattedId = q.invoiceNumber || '-'
+  const showHeight = Boolean(q.heightEnabled)
   const totalQuantity = (q.items || []).reduce((sum, it) => sum + (parseInt(it.quantity) || 0), 0)
 
   return (
@@ -109,13 +110,21 @@ export default function InvoiceDetailPage() {
           </div>
         </div>
 
+        {q.notes && (
+          <div className="px-4 sm:px-6 py-4 border-b border-gray-100 bg-white">
+            <p className="text-[11px] font-bold text-muted uppercase tracking-widest mb-2">Notes</p>
+            <p className="text-sm text-muted leading-relaxed whitespace-pre-line">{q.notes}</p>
+          </div>
+        )}
+
         <div className="overflow-x-auto border-x border-gray-200">
-          <table className="w-full min-w-[600px] sm:min-w-max border-collapse">
+          <table className={`w-full border-collapse ${showHeight ? 'min-w-[720px]' : 'min-w-[600px]'} sm:min-w-max`}>
             <thead>
               <tr className="bg-[#5CB338]">
                 <th className="border border-[#4a912e] px-3 sm:px-5 py-3 text-[11px] font-semibold text-white/90 uppercase tracking-widest text-left">ID</th>
                 <th className="border border-[#4a912e] px-3 sm:px-5 py-3 text-[11px] font-semibold text-white/90 uppercase tracking-widest text-left">Plant Name</th>
-                 <th className="border border-[#4a912e] px-3 sm:px-5 py-3 text-[11px] font-semibold text-white/90 uppercase tracking-widest text-left whitespace-nowrap">Bag / Pot Size</th>
+                <th className="border border-[#4a912e] px-3 sm:px-5 py-3 text-[11px] font-semibold text-white/90 uppercase tracking-widest text-left whitespace-nowrap">Bag / Pot Size</th>
+                {showHeight && <th className="border border-[#4a912e] px-3 sm:px-5 py-3 text-[11px] font-semibold text-white/90 uppercase tracking-widest text-left whitespace-nowrap">Height</th>}
                 <th className="border border-[#4a912e] px-3 sm:px-5 py-3 text-[11px] font-semibold text-white/90 uppercase tracking-widest text-right">Qty</th>
                 <th className="border border-[#4a912e] px-3 sm:px-5 py-3 text-[11px] font-semibold text-white/90 uppercase tracking-widest text-right">Price/Pc</th>
                 <th className="border border-[#4a912e] px-3 sm:px-5 py-3 text-[11px] font-semibold text-white/90 uppercase tracking-widest text-right">Total</th>
@@ -127,6 +136,7 @@ export default function InvoiceDetailPage() {
                   <td className="border border-gray-200 px-3 sm:px-5 py-3.5 text-sm text-muted font-mono">{i + 1}</td>
                   <td className="border border-gray-200 px-3 sm:px-5 py-3.5 text-sm font-semibold text-ink break-words min-w-[100px]">{item.plantName}</td>
                   <td className="border border-gray-200 px-3 sm:px-5 py-3.5 text-sm text-muted whitespace-nowrap">{item.dimension || '-'}</td>
+                  {showHeight && <td className="border border-gray-200 px-3 sm:px-5 py-3.5 text-sm text-muted whitespace-nowrap">{item.height || '-'}</td>}
                   <td className="border border-gray-200 px-3 sm:px-5 py-3.5 text-sm text-right text-muted font-mono">{item.quantity}</td>
                   <td className="border border-gray-200 px-3 sm:px-5 py-3.5 text-sm text-right text-muted font-mono">{formatCurrency(item.price)}</td>
                   <td className="border border-gray-200 px-3 sm:px-5 py-3.5 text-sm text-right font-bold text-[#5CB338] font-mono">{formatCurrency(item.price * item.quantity)}</td>

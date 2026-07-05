@@ -15,7 +15,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Arrays;
-import java.util.Locale;
 import java.util.UUID;
 
 @Slf4j
@@ -57,20 +56,15 @@ public class NurseryProfileService {
         boolean isNewProfile = existingProfile.isEmpty();
         NurseryProfile profile = existingProfile.orElseGet(() -> NurseryProfile.builder().userId(userId).build());
 
-        validateUniqueEmail(userId, request.email());
         applyProfileFields(profile, request);
 
          NurseryProfile saved;
          try {
              saved = profileRepository.save(profile);
          } catch (DataIntegrityViolationException ex) {
-             if (isEmailConstraintViolation(ex)) {
-                 throw new BusinessException("That email address is already being used by another profile.");
-             }
              // Another request likely created the profile concurrently; retry as update.
              NurseryProfile retryProfile = profileRepository.findByUserId(userId)
                      .orElseThrow(() -> ex);
-             validateUniqueEmail(userId, request.email());
              applyProfileFields(retryProfile, request);
              saved = profileRepository.save(retryProfile);
              isNewProfile = false;
@@ -96,26 +90,12 @@ public class NurseryProfileService {
         profile.setInitials(deriveInitials(request.nurseryName()));
     }
 
-    private void validateUniqueEmail(UUID userId, String email) {
-        String normalizedEmail = normalizeOptional(email);
-        if (normalizedEmail != null && profileRepository.existsByEmailIgnoreCaseAndUserIdNot(normalizedEmail, userId)) {
-            throw new BusinessException("That email address is already being used by another profile.");
-        }
-    }
-
     private String normalizeOptional(String value) {
         if (value == null) {
             return null;
         }
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
-    }
-
-    private boolean isEmailConstraintViolation(DataIntegrityViolationException ex) {
-        String message = ex.getMostSpecificCause() != null
-                ? ex.getMostSpecificCause().getMessage()
-                : ex.getMessage();
-        return message != null && message.toLowerCase(Locale.ROOT).contains("uq_nursery_profiles_email");
     }
 
     /**

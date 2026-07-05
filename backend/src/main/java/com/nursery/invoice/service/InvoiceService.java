@@ -58,7 +58,10 @@ public class InvoiceService {
                 .customerName(request.getCustomerName())
                 .customerPhone(request.getCustomerPhone())
                 .customerAddress(request.getCustomerAddress())
+                .notes(request.getNotes())
+                .heightEnabled(Boolean.TRUE.equals(request.getHeightEnabled()))
                 .year(Year.now().getValue())
+                .invoiceDate(OffsetDateTime.now())
                 .build();
 
         applyItems(invoice, request.getItems());
@@ -116,6 +119,11 @@ public class InvoiceService {
         invoice.setCustomerName(request.getCustomerName());
         invoice.setCustomerPhone(request.getCustomerPhone());
         invoice.setCustomerAddress(request.getCustomerAddress());
+        invoice.setNotes(request.getNotes());
+        invoice.setHeightEnabled(Boolean.TRUE.equals(request.getHeightEnabled()));
+        if (invoice.getInvoiceDate() == null) {
+            invoice.setInvoiceDate(OffsetDateTime.now());
+        }
 
         if (request.getItems() != null) {
             invoice.getItems().clear();
@@ -146,14 +154,18 @@ public class InvoiceService {
                 .customerName(source.getCustomerName())
                 .customerPhone(source.getCustomerPhone())
                 .customerAddress(source.getCustomerAddress())
+                .notes(source.getNotes())
+                .heightEnabled(source.isHeightEnabled())
                 .year(Year.now().getValue())
                 .totalAmount(source.getTotalAmount())
+                .invoiceDate(OffsetDateTime.now())
                 .build();
 
         List<InvoiceItem> copied = source.getItems().stream().map(item -> InvoiceItem.builder()
                 .invoice(invoice)
                 .plantName(item.getPlantName())
                 .dimension(item.getDimension())
+                .height(item.getHeight())
                 .quantity(item.getQuantity())
                 .price(item.getPrice())
                 .itemTotal(item.getItemTotal())
@@ -179,10 +191,21 @@ public class InvoiceService {
         if (reqs == null) return;
         List<InvoiceItem> items = new ArrayList<>();
         for (InvoiceItemRequest r : reqs) {
+            String height = null;
+            if (invoice.isHeightEnabled()) {
+                if (r.getHeight() == null || r.getHeight().isBlank()) {
+                    throw new BusinessException("Height is required when height is enabled for the invoice.");
+                }
+                if (!isValidHeightFormat(r.getHeight())) {
+                    throw new BusinessException("Height must be like 6 inch, 6 ft, 6 feet, or 6'.");
+                }
+                height = normalizeHeight(r.getHeight());
+            }
             InvoiceItem it = InvoiceItem.builder()
                     .invoice(invoice)
                     .plantName(r.getPlantName())
                     .dimension(r.getDimension())
+                    .height(height)
                     .quantity(r.getQuantity())
                     .price(r.getPrice())
                     .itemTotal((r.getPrice() == null ? BigDecimal.ZERO : r.getPrice()).multiply(BigDecimal.valueOf(r.getQuantity() == null ? 0 : r.getQuantity())))
@@ -243,6 +266,8 @@ public class InvoiceService {
                 baseResponse.getCustomerName(),
                 baseResponse.getCustomerPhone(),
                 baseResponse.getCustomerAddress(),
+                baseResponse.getNotes(),
+                baseResponse.getHeightEnabled(),
                 profile != null ? profile.getNurseryName() : null,
                 profile != null ? profile.getAddress() : null,
                 profile != null ? profile.getPhone() : null,
@@ -263,5 +288,17 @@ public class InvoiceService {
                 ? profile.getInitials().toUpperCase()
                 : "INV";
         return String.format("INV-%s%04d", initials, invoice.getSequence());
+    }
+
+    private boolean isValidHeightFormat(String height) {
+        if (height == null) return false;
+        String trimmed = height.trim();
+        if (trimmed.isEmpty()) return false;
+
+        return trimmed.matches("(?i)^(?:\\d+(?:\\.\\d+)?\\s*(?:in|inch(?:es)?|ft|feet|foot|')|\\d+'\\s*\\d+\\\"?)$");
+    }
+
+    private String normalizeHeight(String height) {
+        return height == null ? null : height.trim().replaceAll("\\s+", " ");
     }
 }

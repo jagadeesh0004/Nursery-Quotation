@@ -34,6 +34,8 @@ public class Invoice {
     private String customerName;
     private String customerPhone;
     private String customerAddress;
+    private String notes;
+    private boolean heightEnabled;
 
     private BigDecimal totalAmount;
 
@@ -41,7 +43,21 @@ public class Invoice {
     @Builder.Default
     private List<InvoiceItem> items = new ArrayList<>();
 
+    @Column(name = "invoice_date", nullable = false)
+    private OffsetDateTime invoiceDate;
+
     private OffsetDateTime createdAt;
     private OffsetDateTime finalizedAt;
     private OffsetDateTime deletedAt;
+
+    @PrePersist
+    public void prePersist() {
+        OffsetDateTime now = OffsetDateTime.now();
+        if (createdAt == null) {
+            createdAt = now;
+        }
+        if (invoiceDate == null) {
+            invoiceDate = now;
+        }
+    }
 }

@@ -24,6 +24,7 @@ public class InvoiceItem {
 
     private String plantName;
     private String dimension;
+    private String height;
     private Integer quantity;
     private BigDecimal price;
     private BigDecimal itemTotal;

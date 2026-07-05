@@ -4,23 +4,28 @@ import { ArrowLeft, Plus, Trash2, Calculator, Save, CheckCheck, AlertTriangle } 
 import toast from 'react-hot-toast'
 import { invoiceService, plantService } from '../services'
 import { Button, Input, Textarea, Spinner, SectionCard } from '../components/ui'
-import { formatCurrency, getError, cx } from '../utils'
+import { formatCurrency, formatNumber, getError, cx } from '../utils'
 
-const newItem = () => ({ plantName: '', dimension: '', quantity: 1, price: '' })
+const newItem = () => ({ plantName: '', dimension: '', height: '', quantity: '', price: '' })
 
 export default function InvoiceFormPage() {
-  const { id }   = useParams()
-  const isEdit   = Boolean(id)
+  const { id } = useParams()
+  const isEdit = Boolean(id)
   const navigate = useNavigate()
 
-  const [plants,          setPlants]          = useState([])
-  const [customerName,    setCustomerName]    = useState('')
-  const [customerPhone,   setCustomerPhone]   = useState('')
+  const [plants, setPlants] = useState([])
+  const [customerName, setCustomerName] = useState('')
+  const [customerPhone, setCustomerPhone] = useState('')
   const [customerAddress, setCustomerAddress] = useState('')
-  const [items,           setItems]           = useState([newItem()])
-  const [pageLoading,     setPageLoading]     = useState(isEdit)
-  const [saving,          setSaving]          = useState(false)
-  const [errors,          setErrors]          = useState({})
+  const [notes, setNotes] = useState('')
+  const [heightEnabled, setHeightEnabled] = useState(false)
+  const [items, setItems] = useState([newItem()])
+  const [pageLoading, setPageLoading] = useState(isEdit)
+  const [saving, setSaving] = useState(false)
+  const [errors, setErrors] = useState({})
+  const [activeSearch, setActiveSearch] = useState(null)
+  const [activeDimSearch, setActiveDimSearch] = useState(null)
+  const [quickAddLoading, setQuickAddLoading] = useState({})
 
   useEffect(() => {
     plantService.list()
@@ -35,19 +40,23 @@ export default function InvoiceFormPage() {
     if (!isEdit) return
     setPageLoading(true)
     invoiceService.getOne(id).then(r => {
-      const q = r.data.data
-      setCustomerName(q.customerName || '')
-      setCustomerPhone(q.customerPhone || '')
-      setCustomerAddress(q.customerAddress || '')
-      setItems(q.items?.length ? q.items.map(i => ({
-        plantName: i.plantName || '', dimension: i.dimension || '',
-        quantity: i.quantity || 1, price: i.price ?? '',
+      const invoice = r.data.data
+      setCustomerName(invoice.customerName || '')
+      setCustomerPhone(invoice.customerPhone || '')
+      setCustomerAddress(invoice.customerAddress || '')
+      setNotes(invoice.notes || '')
+      setHeightEnabled(Boolean(invoice.heightEnabled))
+      setItems(invoice.items?.length ? invoice.items.map(i => ({
+        plantName: i.plantName || '',
+        dimension: i.dimension || '',
+        height: i.height || '',
+        quantity: i.quantity ?? 0,
+        price: i.price ?? '',
       })) : [newItem()])
     }).catch((err) => {
       const message = getError(err)
       if (message) toast.error(message)
-    })
-    .finally(() => setPageLoading(false))
+    }).finally(() => setPageLoading(false))
   }, [id, isEdit])
 
   function getDimensions(plantName) {
@@ -55,6 +64,7 @@ export default function InvoiceFormPage() {
   }
 
   function updateItem(index, field, value) {
+    if (field === 'quantity') value = value === '' ? '' : Number(value)
     setItems(prev => {
       const next = [...prev]
       next[index] = { ...next[index], [field]: value }
@@ -67,38 +77,35 @@ export default function InvoiceFormPage() {
     })
   }
 
-  function addItem()       { setItems(p => [...p, newItem()]) }
+  function addItem() { setItems(p => [...p, newItem()]) }
   function removeItem(idx) { setItems(p => p.filter((_, i) => i !== idx)) }
 
   const grandTotal = items.reduce(
     (sum, it) => sum + (parseFloat(it.price) || 0) * (parseInt(it.quantity) || 0), 0
   )
 
+  const allUniqueDimensions = Array.from(new Set(plants.flatMap(p => p.dimensions?.map(d => d.dimension || d.label) || []))).filter(Boolean).sort()
+
+  const desktopCols = heightEnabled
+    ? '3fr 1.75fr 1.5fr 1.75fr 1.75fr 1.75fr 0.75fr'
+    : '3.25fr 2.25fr 1.75fr 2fr 2fr 1fr'
+
   function validate(shouldFinalize) {
     const errs = {}
-
-    if (shouldFinalize && !customerName.trim()) {
-      errs.customerName = 'Customer name is required'
-    }
-
-    if (shouldFinalize && !customerPhone.trim()) {
-      errs.customerPhone = 'Phone number is required to finalize'
-    }
-
-    if (shouldFinalize && !customerAddress.trim()) {
-      errs.customerAddress = 'Address is required to finalize'
-    }
-
+    if (shouldFinalize && !customerName.trim()) errs.customerName = 'Customer name is required'
+    if (shouldFinalize && !customerPhone.trim()) errs.customerPhone = 'Phone number is required to finalize'
+    if (shouldFinalize && !customerAddress.trim()) errs.customerAddress = 'Address is required to finalize'
     const validItems = items.filter(it => it.plantName)
     if (validItems.length === 0) errs.items = 'Add at least one plant item to save the invoice'
-
     items.forEach((it, i) => {
       if (it.plantName && (it.price === '' || it.price === null || it.price === undefined)) {
         if (!errs.itemRows) errs.itemRows = {}
         errs.itemRows[i] = 'Price is required'
+      } else if (heightEnabled && it.plantName && (!it.height || !it.height.trim())) {
+        if (!errs.itemRows) errs.itemRows = {}
+        errs.itemRows[i] = 'Height is required when enabled'
       }
     })
-
     setErrors(errs)
     return errs
   }
@@ -118,27 +125,88 @@ export default function InvoiceFormPage() {
     setSaving(true)
     try {
       const payload = {
-        customerName:    customerName.trim()    || undefined,
-        customerPhone:   customerPhone.trim()   || undefined,
+        customerName: customerName.trim() || undefined,
+        customerPhone: customerPhone.trim() || undefined,
         customerAddress: customerAddress.trim() || undefined,
+        notes: notes.trim() || undefined,
+        heightEnabled,
         items: items.filter(it => it.plantName).map(it => ({
           plantName: it.plantName,
           dimension: it.dimension,
-          quantity:  parseInt(it.quantity) || 1,
-          price:     parseFloat(it.price)  || 0,
+          height: heightEnabled ? (it.height || '').trim() : undefined,
+          quantity: parseInt(it.quantity) || 0,
+          price: parseFloat(it.price) || 0,
         })),
         shouldFinalize,
       }
       let res
       if (isEdit) res = await invoiceService.update(id, payload)
-      else        res = await invoiceService.create(payload)
+      else res = await invoiceService.create(payload)
       toast.success(shouldFinalize ? 'Invoice finalized!' : 'Draft saved!')
       navigate(`/invoices/${res.data.data?.id || id}`)
     } catch (err) {
       const message = getError(err)
       if (message) toast.error(message)
+    } finally {
+      setSaving(false)
     }
-    finally { setSaving(false) }
+  }
+
+  async function handleQuickAddPlant(idx) {
+    const it = items[idx]
+    if (!it.plantName || !it.dimension || !it.price) {
+      toast.error('Please enter Plant Name, Size, and Price to add to master')
+      return
+    }
+    setQuickAddLoading(prev => ({ ...prev, [`plant-${idx}`]: true }))
+    try {
+      const created = await plantService.create(it.plantName.trim())
+      const plantId = created.data.data?.id
+      if (plantId) {
+        await plantService.addDimension(plantId, it.dimension.trim(), parseFloat(it.price) || 0)
+      }
+      const r = await plantService.list()
+      setPlants(r.data.data || [])
+      toast.success('Plant added to master list')
+    } catch (err) {
+      const message = getError(err)
+      if (message) toast.error(message)
+    } finally {
+      setQuickAddLoading(prev => ({ ...prev, [`plant-${idx}`]: false }))
+    }
+  }
+
+  async function handleQuickAddDimension(idx) {
+    const it = items[idx]
+    if (!it.plantName || !it.dimension || !it.price) {
+      toast.error('Please enter Size and Price to add to master')
+      return
+    }
+    setQuickAddLoading(prev => ({ ...prev, [`dimension-${idx}`]: true }))
+    try {
+      const plant = plants.find(p => p.name.toLowerCase() === it.plantName.toLowerCase())
+      if (plant?.id) {
+        await plantService.addDimension(plant.id, it.dimension.trim(), parseFloat(it.price) || 0)
+        const r = await plantService.list()
+        setPlants(r.data.data || [])
+        toast.success('Size added to master list')
+      }
+    } catch (err) {
+      const message = getError(err)
+      if (message) toast.error(message)
+    } finally {
+      setQuickAddLoading(prev => ({ ...prev, [`dimension-${idx}`]: false }))
+    }
+  }
+
+  function toggleHeightEnabled() {
+    setHeightEnabled(prev => {
+      const next = !prev
+      if (!next) {
+        setItems(current => current.map(item => ({ ...item, height: '' })))
+      }
+      return next
+    })
   }
 
   if (pageLoading) return (
@@ -171,23 +239,49 @@ export default function InvoiceFormPage() {
         <Textarea label="Address" placeholder="Shipping / delivery address"
           value={customerAddress} onChange={e => setCustomerAddress(e.target.value)} rows={2}
           error={errors.customerAddress} />
+        <Textarea label="Notes" placeholder="Add any special instructions or remarks"
+          value={notes} onChange={e => setNotes(e.target.value)} rows={3} />
       </SectionCard>
 
       <SectionCard title="Items" icon="🌿" className="mb-4">
+        <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-xl border border-green-100 bg-green-50/60 px-4 py-3">
+          <div>
+            <p className="text-sm font-semibold text-ink">Height option</p>
+            <p className="text-xs text-muted">Turn this on only for invoices that need height values on every plant row.</p>
+          </div>
+          <button
+            type="button"
+            onClick={toggleHeightEnabled}
+            className={cx(
+              'inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-colors border',
+              heightEnabled
+                ? 'bg-green-600 text-white border-green-600'
+                : 'bg-white text-muted border-gray-200 hover:border-green-300 hover:text-[#5CB338]'
+            )}
+          >
+            <span className={cx('w-2.5 h-2.5 rounded-full', heightEnabled ? 'bg-white' : 'bg-gray-300')} />
+            {heightEnabled ? 'Height enabled' : 'Height disabled'}
+          </button>
+        </div>
+
         {errors.items && (
           <div className="mb-3 flex items-center gap-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2">
             <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" /> {errors.items}
           </div>
         )}
 
-        <div className="hidden sm:grid grid-cols-12 gap-3 mb-2 px-1">
+        <div
+          className="hidden sm:grid gap-3 mb-2 px-1"
+          style={{ gridTemplateColumns: desktopCols }}
+        >
           {[
-            ['Plant Name','col-span-4'],
-            ['Bag / Pot Size','col-span-3'],
-            ['Qty','col-span-1'],
-            ['Price / Pc','col-span-2'],
-            ['Total','col-span-1 text-right'],
-            ['','col-span-1']
+            ['Plant Name', ''],
+            ['Bag Size', ''],
+            ...(heightEnabled ? [['Height', '']] : []),
+            ['Qty', 'text-center'],
+            ['Rate', ''],
+            ['Total', 'text-right'],
+            ['', ''],
           ].map(([h, cls]) => (
             <span key={h} className={cx('text-[11px] font-semibold text-muted uppercase tracking-wide', cls)}>{h}</span>
           ))}
@@ -195,53 +289,300 @@ export default function InvoiceFormPage() {
 
         <div className="space-y-4 sm:space-y-3">
           {items.map((item, idx) => {
-            const existingPlant = plants.find(p => p.name.toLowerCase() === (item.plantName || '').toLowerCase());
-            const isCustomPlant = item.plantName && !existingPlant;
-            const isNewDimension = existingPlant && item.dimension && !getDimensions(item.plantName).some(d => (d.dimension || d.label)?.toLowerCase() === item.dimension.toLowerCase());
+            const existingPlant = plants.find(p => p.name.toLowerCase() === (item.plantName || '').toLowerCase())
+            const isCustomPlant = item.plantName && !existingPlant
+            const isNewDimension = existingPlant && item.dimension && !getDimensions(item.plantName).some(d => (d.dimension || d.label)?.toLowerCase() === item.dimension.toLowerCase())
+            const isPlantQuickAdding = Boolean(quickAddLoading[`plant-${idx}`])
+            const isDimensionQuickAdding = Boolean(quickAddLoading[`dimension-${idx}`])
 
             const searchLower = (item.plantName || '').toLowerCase()
+            const filteredPlants = activeSearch === idx ? plants.filter(p => p.name.toLowerCase().includes(searchLower)) : []
+
+            const dimSearchLower = (item.dimension || '').toLowerCase()
+            const knownDimsForPlant = getDimensions(item.plantName).map(d => d.dimension || d.label)
+            let filteredDims = []
+            if (activeDimSearch === idx) {
+              filteredDims = dimSearchLower
+                ? allUniqueDimensions.filter(d => d.toLowerCase().includes(dimSearchLower))
+                : knownDimsForPlant.length > 0 ? knownDimsForPlant : allUniqueDimensions.slice(0, 10)
+            }
 
             return (
-              <div key={idx} className="grid grid-cols-12 gap-3 items-center">
-                <div className="col-span-4">
-                  <Input label="Plant Name" placeholder="e.g. Money Plant" value={item.plantName}
-                    onChange={e => updateItem(idx, 'plantName', e.target.value)} />
+              <div key={idx} className="transition-colors">
+                <div
+                  className={cx(
+                    'hidden sm:grid gap-3 items-start',
+                    errors.itemRows?.[idx] ? 'bg-red-50/40 rounded-xl px-2 py-1' : ''
+                  )}
+                  style={{ gridTemplateColumns: desktopCols }}
+                >
+                  <div className="flex flex-col relative">
+                    <input
+                      autoComplete="off"
+                      value={item.plantName}
+                      onChange={e => { updateItem(idx, 'plantName', e.target.value); setActiveSearch(idx) }}
+                      onFocus={() => setActiveSearch(idx)}
+                      onBlur={() => setTimeout(() => setActiveSearch(null), 200)}
+                      placeholder="Search or type plant"
+                      className="field bg-white w-full text-sm"
+                    />
+                    {activeSearch === idx && filteredPlants.length > 0 && (
+                      <div className="absolute top-full left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-xl shadow-lg z-50 py-1">
+                        {filteredPlants.map(p => (
+                          <div key={p.id} className="px-3 py-2 text-sm hover:bg-green-50 cursor-pointer text-gray-700"
+                            onClick={() => { updateItem(idx, 'plantName', p.name); setActiveSearch(null) }}>
+                            {p.name}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {isCustomPlant && activeSearch !== idx && (
+                      <div className="mt-2 flex flex-col gap-1.5 items-start animate-fade-in">
+                        <p className="text-[10px] text-amber-600 font-medium bg-amber-50 px-1.5 py-0.5 rounded border border-amber-100 inline-block w-fit">
+                          New Plant detected. You can add it to master.
+                        </p>
+                        <button onClick={() => handleQuickAddPlant(idx)} disabled={isPlantQuickAdding}
+                          className="text-[11px] bg-green-50 text-green-700 hover:bg-green-100 px-2.5 py-1.5 rounded-lg border border-green-200 transition-colors flex items-center gap-1 font-medium shadow-sm w-fit disabled:opacity-60 disabled:cursor-not-allowed">
+                          {isPlantQuickAdding ? <Spinner size="sm" className="text-green-700" /> : <Plus className="w-3 h-3" />} Add "{item.plantName}" to Master
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex flex-col relative">
+                    <input type="text" autoComplete="off"
+                      value={item.dimension}
+                      onChange={e => { updateItem(idx, 'dimension', e.target.value); setActiveDimSearch(idx) }}
+                      onFocus={() => setActiveDimSearch(idx)}
+                      onBlur={() => setTimeout(() => setActiveDimSearch(null), 200)}
+                      placeholder='5x5, 10 kgs, Pot'
+                      className="field bg-white w-full text-sm"
+                    />
+                    {activeDimSearch === idx && filteredDims.length > 0 && (
+                      <div className="absolute top-full left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-xl shadow-lg z-50 py-1">
+                        {filteredDims.map(d => (
+                          <div key={d} className="px-3 py-2 text-sm hover:bg-green-50 cursor-pointer text-gray-700"
+                            onClick={() => { updateItem(idx, 'dimension', d); setActiveDimSearch(null) }}>
+                            {d}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {isNewDimension && activeDimSearch !== idx && (
+                      <div className="mt-2 flex flex-col gap-1.5 items-start animate-fade-in">
+                        <p className="text-[10px] text-blue-600 font-medium bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100 inline-block w-fit">
+                          New Size detected.
+                        </p>
+                        <button onClick={() => handleQuickAddDimension(idx)} disabled={isDimensionQuickAdding}
+                          className="text-[11px] bg-blue-50 text-blue-700 hover:bg-blue-100 px-2.5 py-1.5 rounded-lg border border-blue-200 transition-colors flex items-center gap-1 font-medium shadow-sm w-fit text-left leading-tight disabled:opacity-60 disabled:cursor-not-allowed">
+                          {isDimensionQuickAdding ? <Spinner size="sm" className="text-blue-700" /> : <Plus className="w-3 h-3 flex-shrink-0" />} Add "{item.dimension}" size
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {heightEnabled && (
+                    <div className="flex flex-col relative">
+                      <input
+                        type="text"
+                        autoComplete="off"
+                        value={item.height || ''}
+                        onChange={e => updateItem(idx, 'height', e.target.value)}
+                        placeholder="6 inch, 6 ft, 6'"
+                        className="field bg-white w-full text-sm"
+                      />
+                    </div>
+                  )}
+
+                  <div className="flex flex-col">
+                    <input type="number" min="0" placeholder="0"
+                      value={item.quantity}
+                      onChange={e => updateItem(idx, 'quantity', e.target.value)}
+                      className="field w-full text-sm text-center font-mono bg-white"
+                    />
+                  </div>
+
+                  <div className="flex flex-col">
+                    <div className="relative">
+                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[11px] text-muted font-semibold pointer-events-none">Rs</span>
+                      <input type="number" min="0" step="0.01" placeholder="0"
+                        value={item.price}
+                        onChange={e => updateItem(idx, 'price', e.target.value)}
+                        className={cx('field w-full text-sm font-mono pl-7 bg-white',
+                          errors.itemRows?.[idx] && 'field-error border-red-400')}
+                      />
+                    </div>
+                    {errors.itemRows?.[idx] && (
+                      <p className="text-[10px] text-red-500 mt-1 truncate">{errors.itemRows[idx]}</p>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-end h-full">
+                    <span className="text-sm font-bold text-[#5CB338] font-mono truncate mt-2">
+                      {formatNumber((parseFloat(item.price) || 0) * (parseInt(item.quantity) || 0))}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-center h-full">
+                    {items.length > 1 ? (
+                      <button onClick={() => removeItem(idx)}
+                        className="w-10 h-10 rounded-lg hover:bg-red-100 text-red-500 hover:text-red-700 flex items-center justify-center transition-colors">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    ) : <div className="w-10 h-10" />}
+                  </div>
                 </div>
-                <div className="col-span-3">
-                  <Input label="Size" placeholder="e.g. 12 inch pot" value={item.dimension}
-                    onChange={e => updateItem(idx, 'dimension', e.target.value)} />
-                </div>
-                <div className="col-span-1">
-                  <Input label="Qty" type="number" value={item.quantity}
-                    onChange={e => updateItem(idx, 'quantity', e.target.value)} />
-                </div>
-                <div className="col-span-2">
-                  <Input label="Price" type="number" value={item.price}
-                    onChange={e => updateItem(idx, 'price', e.target.value)} />
-                </div>
-                <div className="col-span-1 text-right font-mono">{formatCurrency((parseFloat(item.price)||0) * (parseInt(item.quantity)||0))}</div>
-                <div className="col-span-1">
-                  <button onClick={() => removeItem(idx)} className="text-red-500 hover:text-red-700">Remove</button>
+
+                <div className={cx(
+                  'sm:hidden grid grid-cols-12 gap-x-2 gap-y-3 items-start p-3.5 rounded-xl',
+                  errors.itemRows?.[idx] ? 'bg-red-50 border border-red-200' : 'bg-gray-50 border border-gray-100'
+                )}>
+                  <div className="col-span-12 flex flex-col relative">
+                    <label className="block text-[10px] font-semibold text-muted uppercase mb-1.5">Plant Name</label>
+                    <input autoComplete="off" value={item.plantName}
+                      onChange={e => { updateItem(idx, 'plantName', e.target.value); setActiveSearch(idx) }}
+                      onFocus={() => setActiveSearch(idx)}
+                      onBlur={() => setTimeout(() => setActiveSearch(null), 200)}
+                      placeholder="Search or type plant"
+                      className="field bg-white w-full text-sm"
+                    />
+                    {activeSearch === idx && filteredPlants.length > 0 && (
+                      <div className="absolute top-full left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-xl shadow-lg z-50 py-1">
+                        {filteredPlants.map(p => (
+                          <div key={p.id} className="px-3 py-2 text-sm hover:bg-green-50 cursor-pointer text-gray-700"
+                            onClick={() => { updateItem(idx, 'plantName', p.name); setActiveSearch(null) }}>
+                            {p.name}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {isCustomPlant && activeSearch !== idx && (
+                      <div className="mt-2 flex flex-col gap-1.5 items-start animate-fade-in">
+                        <p className="text-[10px] text-amber-600 font-medium bg-amber-50 px-1.5 py-0.5 rounded border border-amber-100 inline-block w-fit">
+                          New Plant detected. You can add it to master.
+                        </p>
+                        <button onClick={() => handleQuickAddPlant(idx)} disabled={isPlantQuickAdding}
+                          className="text-[11px] bg-green-50 text-green-700 hover:bg-green-100 px-2.5 py-1.5 rounded-lg border border-green-200 transition-colors flex items-center gap-1 font-medium shadow-sm w-fit disabled:opacity-60 disabled:cursor-not-allowed">
+                          {isPlantQuickAdding ? <Spinner size="sm" className="text-green-700" /> : <Plus className="w-3 h-3" />} Add "{item.plantName}" to Master
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="col-span-7 flex flex-col relative">
+                    <label className="block text-[10px] font-semibold text-muted uppercase mb-1.5">Bag Size / Dimension</label>
+                    <input type="text" autoComplete="off" value={item.dimension}
+                      onChange={e => { updateItem(idx, 'dimension', e.target.value); setActiveDimSearch(idx) }}
+                      onFocus={() => setActiveDimSearch(idx)}
+                      onBlur={() => setTimeout(() => setActiveDimSearch(null), 200)}
+                      placeholder='e.g. 5x5, 10 kgs, 12" Pot'
+                      className="field bg-white w-full text-sm"
+                    />
+                    {activeDimSearch === idx && filteredDims.length > 0 && (
+                      <div className="absolute top-full left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-xl shadow-lg z-50 py-1">
+                        {filteredDims.map(d => (
+                          <div key={d} className="px-3 py-2 text-sm hover:bg-green-50 cursor-pointer text-gray-700"
+                            onClick={() => { updateItem(idx, 'dimension', d); setActiveDimSearch(null) }}>
+                            {d}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {isNewDimension && activeDimSearch !== idx && (
+                      <div className="mt-2 flex flex-col gap-1.5 items-start animate-fade-in">
+                        <p className="text-[10px] text-blue-600 font-medium bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100 inline-block w-fit">
+                          New Size detected.
+                        </p>
+                        <button onClick={() => handleQuickAddDimension(idx)} disabled={isDimensionQuickAdding}
+                          className="text-[11px] bg-blue-50 text-blue-700 hover:bg-blue-100 px-2.5 py-1.5 rounded-lg border border-blue-200 transition-colors flex items-center gap-1 font-medium shadow-sm w-fit text-left leading-tight disabled:opacity-60 disabled:cursor-not-allowed">
+                          {isDimensionQuickAdding ? <Spinner size="sm" className="text-blue-700" /> : <Plus className="w-3 h-3 flex-shrink-0" />} Add "{item.dimension}" size
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {heightEnabled && (
+                    <div className="col-span-12 flex flex-col">
+                      <label className="block text-[10px] font-semibold text-muted uppercase mb-1.5">Height</label>
+                      <input
+                        type="text"
+                        autoComplete="off"
+                        value={item.height || ''}
+                        onChange={e => updateItem(idx, 'height', e.target.value)}
+                        placeholder="6 inch, 6 ft, 6'"
+                        className="field bg-white w-full text-sm"
+                      />
+                    </div>
+                  )}
+
+                  <div className="col-span-5 flex flex-col">
+                    <label className="block text-[10px] font-semibold text-muted uppercase mb-1.5 text-center">Qty</label>
+                    <input type="number" min="0" placeholder="0"
+                      value={item.quantity}
+                      onChange={e => updateItem(idx, 'quantity', e.target.value)}
+                      className="field w-full text-sm text-center font-mono bg-white"
+                    />
+                  </div>
+
+                  <div className="col-span-6 flex flex-col">
+                    <label className="block text-[10px] font-semibold text-muted uppercase mb-1.5">Rate</label>
+                    <div className="relative">
+                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[11px] text-muted font-semibold pointer-events-none">Rs</span>
+                      <input type="number" min="0" step="0.01" placeholder="0"
+                        value={item.price}
+                        onChange={e => updateItem(idx, 'price', e.target.value)}
+                        className={cx('field w-full text-sm font-mono pl-7 bg-white',
+                          errors.itemRows?.[idx] && 'field-error border-red-400')}
+                      />
+                    </div>
+                    {errors.itemRows?.[idx] && <p className="text-[10px] text-red-500 mt-1 truncate">{errors.itemRows[idx]}</p>}
+                  </div>
+
+                  <div className="col-span-4 flex flex-col">
+                    <label className="block text-[10px] font-semibold text-muted uppercase mb-1.5">Total</label>
+                    <span className="text-sm font-bold text-[#5CB338] font-mono truncate mt-2">
+                      {formatNumber((parseFloat(item.price) || 0) * (parseInt(item.quantity) || 0))}
+                    </span>
+                  </div>
+
+                  <div className="col-span-2 flex items-end justify-end pb-1">
+                    {items.length > 1 ? (
+                      <button onClick={() => removeItem(idx)}
+                        className="w-10 h-10 rounded-xl hover:bg-red-100 text-red-500 bg-white border border-red-100 hover:text-red-700 flex items-center justify-center transition-colors shadow-sm">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    ) : <div className="w-10 h-10" />}
+                  </div>
                 </div>
               </div>
             )
           })}
         </div>
 
-        <div className="flex items-center justify-between mt-4">
-          <div className="flex items-center gap-2">
-            <Button onClick={addItem} variant="ghost"><Plus className="w-4 h-4" /> Add item</Button>
-          </div>
-          <div className="text-right">
-            <div className="text-sm text-muted">Grand Total</div>
-            <div className="text-2xl font-bold text-[#5CB338]">{formatCurrency(grandTotal)}</div>
-          </div>
-        </div>
+        <button onClick={addItem}
+          className="mt-3 w-full flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-dashed border-gray-200 hover:border-green-400 hover:bg-green-50/50 text-sm text-muted hover:text-[#5CB338] font-medium transition-all">
+          <Plus className="w-4 h-4" /> Add Item
+        </button>
       </SectionCard>
 
-      <div className="flex items-center gap-2.5">
-        <Button variant="secondary" onClick={() => handleSave(false)} loading={saving}>Save Draft</Button>
-        <Button onClick={() => handleSave(true)} loading={saving} className="ml-auto">Finalize Invoice</Button>
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-11 h-11 rounded-xl bg-green-100 flex items-center justify-center">
+            <Calculator className="w-5 h-5 text-[#5CB338]" strokeWidth={1.5} />
+          </div>
+          <div>
+            <p className="text-[11px] font-semibold text-muted uppercase tracking-widest">Grand Total</p>
+            <p className="text-2xl font-bold text-[#5CB338] font-mono leading-none mt-0.5">{formatCurrency(grandTotal)}</p>
+          </div>
+        </div>
+        <div className="flex gap-2.5 w-full sm:w-auto">
+          <Button variant="secondary" onClick={() => handleSave(false)} loading={saving} className="flex-1 sm:flex-none">
+            <Save className="w-4 h-4" /> Save Draft
+          </Button>
+          <Button onClick={() => handleSave(true)} loading={saving} className="flex-1 sm:flex-none">
+            <CheckCheck className="w-4 h-4" /> Finalize
+          </Button>
+        </div>
       </div>
     </div>
   )

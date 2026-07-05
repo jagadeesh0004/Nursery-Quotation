@@ -15,6 +15,8 @@ public class InvoiceDtos {
         String customerName;
         String customerPhone;
         String customerAddress;
+        String notes;
+        Boolean heightEnabled;
         List<InvoiceItemRequest> items;
         Boolean shouldFinalize;
     }
@@ -24,6 +26,8 @@ public class InvoiceDtos {
         String customerName;
         String customerPhone;
         String customerAddress;
+        String notes;
+        Boolean heightEnabled;
         List<InvoiceItemRequest> items;
         Boolean shouldFinalize;
     }
@@ -32,6 +36,7 @@ public class InvoiceDtos {
     public static class InvoiceItemRequest {
         String plantName;
         String dimension;
+        String height;
         Integer quantity;
         BigDecimal price;
     }
@@ -40,6 +45,7 @@ public class InvoiceDtos {
     public static class InvoiceItemResponse {
         String plantName;
         String dimension;
+        String height;
         Integer quantity;
         BigDecimal price;
         BigDecimal itemTotal;
@@ -53,6 +59,8 @@ public class InvoiceDtos {
         String customerName;
         String customerPhone;
         String customerAddress;
+        String notes;
+        Boolean heightEnabled;
         String nurseryName;
         String nurseryAddress;
         String nurseryPhone;

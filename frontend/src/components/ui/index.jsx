@@ -118,7 +118,7 @@ export function Card({ children, className, ...props }) {
 // ── Section card with coloured left border ────────────────────
 export function SectionCard({ title, icon, children, className }) {
   return (
-    <div className={cx('bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden', className)}>
+    <div className={cx('bg-white rounded-2xl border border-gray-100 shadow-sm overflow-visible', className)}>
       {title && (
         <div className="flex items-center gap-2.5 px-5 py-3.5 bg-green-50 border-b border-green-100">
           {icon && <span className="text-base">{icon}</span>}
