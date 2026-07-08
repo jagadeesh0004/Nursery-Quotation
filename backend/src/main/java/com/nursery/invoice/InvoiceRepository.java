@@ -20,8 +20,15 @@ public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
            "AND (:search IS NULL OR LOWER(i.customerName) LIKE LOWER(CONCAT('%', :search, '%')))" )
     Page<Invoice> findByUserIdWithSearch(UUID userId, String search, Pageable pageable);
 
+    @Query("SELECT i FROM Invoice i WHERE i.userId = :userId AND i.status = :status AND i.deletedAt IS NULL " +
+           "AND (:search IS NULL OR LOWER(i.customerName) LIKE LOWER(CONCAT('%', :search, '%')))")
+    Page<Invoice> findByUserIdAndStatusWithSearch(UUID userId, InvoiceStatus status, String search, Pageable pageable);
+
     @Query("SELECT i FROM Invoice i WHERE i.userId = :userId AND i.deletedAt IS NULL ORDER BY i.createdAt DESC LIMIT :limit")
     List<Invoice> findRecentByUserId(UUID userId, int limit);
+
+    @Query("SELECT COUNT(i) > 0 FROM Invoice i WHERE i.userId = :userId AND i.invoiceNumber = :invoiceNumber")
+    boolean existsByUserIdAndInvoiceNumber(UUID userId, String invoiceNumber);
 
     @Query("SELECT COALESCE(MAX(i.sequence), 0) FROM Invoice i WHERE i.userId = :userId AND i.year = :year")
     int findMaxSequenceForUserAndYear(UUID userId, int year);

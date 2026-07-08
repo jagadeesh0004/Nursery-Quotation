@@ -12,6 +12,7 @@ import toast from 'react-hot-toast'
 import { quotationService, plantService } from '../services'
 import { Button, Input, Textarea, Spinner, SectionCard } from '../components/ui'
 import { formatCurrency, formatNumber, getError, cx } from '../utils'
+import { getUnitWeightFromDimension } from '../constants/weightMapping'
 
 const newItem = () => ({ plantName: '', dimension: '', height: '', quantity: '', price: '' })
 
@@ -26,6 +27,8 @@ export default function QuotationFormPage() {
   const [customerAddress, setCustomerAddress] = useState('')
   const [notes,           setNotes]           = useState('')
   const [heightEnabled,   setHeightEnabled]   = useState(false)
+  const [loadingChargesEnabled, setLoadingChargesEnabled] = useState(false)
+  const [loadingPricePerTon, setLoadingPricePerTon] = useState('')
   const [items,           setItems]           = useState([newItem()])
   const [pageLoading,     setPageLoading]     = useState(isEdit)
   const [saving,          setSaving]          = useState(false)
@@ -53,6 +56,8 @@ export default function QuotationFormPage() {
       setCustomerAddress(q.customerAddress || '')
       setNotes(q.notes || '')
       setHeightEnabled(Boolean(q.heightEnabled))
+      setLoadingChargesEnabled(Boolean(q.loadingChargesEnabled))
+      setLoadingPricePerTon(q.loadingPricePerTon ?? '')
       setItems(q.items?.length ? q.items.map(i => ({
         plantName: i.plantName || '', dimension: i.dimension || '', height: i.height || '',
         quantity: i.quantity ?? 0, price: i.price ?? '',
@@ -89,6 +94,15 @@ export default function QuotationFormPage() {
     (sum, it) => sum + (parseFloat(it.price) || 0) * (parseInt(it.quantity) || 0), 0
   )
 
+  const totalWeightKg = items.reduce(
+    (sum, it) => sum + (getUnitWeightFromDimension(it.dimension) * (parseInt(it.quantity) || 0)),
+    0
+  )
+  const loadingAmount = loadingChargesEnabled && loadingPricePerTon !== ''
+    ? (parseFloat(loadingPricePerTon) || 0) * (totalWeightKg / 1000)
+    : 0
+  const finalTotal = grandTotal + loadingAmount
+
   const allUniqueDimensions = Array.from(new Set(plants.flatMap(p => p.dimensions?.map(d => d.dimension || d.label) || []))).filter(Boolean).sort()
 
   const desktopCols = heightEnabled
@@ -103,6 +117,7 @@ export default function QuotationFormPage() {
     if (shouldFinalize && !customerAddress.trim()) errs.customerAddress = 'Address is required to finalize'
     const validItems = items.filter(it => it.plantName)
     if (validItems.length === 0) errs.items = 'Add at least one plant item to save the quotation'
+    if (loadingChargesEnabled && loadingPricePerTon === '') errs.loadingPricePerTon = 'Loading price per ton is required'
     items.forEach((it, i) => {
       if (it.plantName && (it.price === '' || it.price === null || it.price === undefined)) {
         if (!errs.itemRows) errs.itemRows = {}
@@ -136,6 +151,8 @@ export default function QuotationFormPage() {
         customerAddress: customerAddress.trim() || undefined,
         notes:           notes.trim()           || undefined,
         heightEnabled,
+        loadingChargesEnabled,
+        loadingPricePerTon: loadingChargesEnabled ? (parseFloat(loadingPricePerTon) || 0) : undefined,
         items: items.filter(it => it.plantName).map(it => ({
           plantName: it.plantName,
           dimension: it.dimension,
@@ -214,6 +231,16 @@ export default function QuotationFormPage() {
     })
   }
 
+  function toggleLoadingCharges() {
+    setLoadingChargesEnabled(prev => {
+      const next = !prev
+      if (!next) {
+        setLoadingPricePerTon('')
+      }
+      return next
+    })
+  }
+
   if (pageLoading) return (
     <div className="flex items-center justify-center h-64 gap-3 text-muted">
       <Spinner size="md" /> Loading quotation...
@@ -273,6 +300,47 @@ export default function QuotationFormPage() {
             {heightEnabled ? 'Height enabled' : 'Height disabled'}
           </button>
         </div>
+
+        <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-xl border border-amber-100 bg-amber-50/70 px-4 py-3">
+          <div>
+            <p className="text-sm font-semibold text-ink">Loading charges</p>
+            <p className="text-xs text-muted">Optionally add a loading price per ton and include it in the total.</p>
+          </div>
+          <button
+            type="button"
+            onClick={toggleLoadingCharges}
+            className={cx(
+              'inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-colors border',
+              loadingChargesEnabled
+                ? 'bg-amber-600 text-white border-amber-600'
+                : 'bg-white text-muted border-gray-200 hover:border-amber-300 hover:text-amber-700'
+            )}
+          >
+            <span className={cx('w-2.5 h-2.5 rounded-full', loadingChargesEnabled ? 'bg-white' : 'bg-gray-300')} />
+            {loadingChargesEnabled ? 'Loading enabled' : 'Loading disabled'}
+          </button>
+        </div>
+
+        {loadingChargesEnabled && (
+          <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 gap-4 rounded-xl border border-amber-100 bg-amber-50/50 p-4">
+            <Input
+              label="Loading price per ton"
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="e.g. 2500"
+              value={loadingPricePerTon}
+              onChange={e => setLoadingPricePerTon(e.target.value)}
+              error={errors.loadingPricePerTon}
+            />
+            <div className="rounded-xl border border-amber-100 bg-white px-4 py-3">
+              <p className="text-[10px] font-semibold text-muted uppercase tracking-widest">Preview</p>
+              <p className="mt-1 text-sm text-ink">Weight: {formatNumber(totalWeightKg)} kg</p>
+              <p className="text-sm text-ink">Loading: {formatCurrency(loadingAmount)}</p>
+              <p className="text-sm text-ink">Final total: {formatCurrency(finalTotal)}</p>
+            </div>
+          </div>
+        )}
 
         {errors.items && (
           <div className="mb-3 flex items-center gap-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2">
@@ -600,7 +668,7 @@ export default function QuotationFormPage() {
           </div>
           <div>
             <p className="text-[11px] font-semibold text-muted uppercase tracking-widest">Grand Total</p>
-            <p className="text-2xl font-bold text-[#5CB338] font-mono leading-none mt-0.5">{formatCurrency(grandTotal)}</p>
+            <p className="text-2xl font-bold text-[#5CB338] font-mono leading-none mt-0.5">{formatCurrency(finalTotal)}</p>
           </div>
         </div>
         <div className="flex gap-2.5 w-full sm:w-auto">

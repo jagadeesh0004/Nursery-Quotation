@@ -1,0 +1,9 @@
+ALTER TABLE quotations
+  ADD COLUMN IF NOT EXISTS loading_charges_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS loading_price_per_ton NUMERIC(12,2),
+  ADD COLUMN IF NOT EXISTS loading_charges_amount NUMERIC(12,2) NOT NULL DEFAULT 0;
+
+ALTER TABLE invoices
+  ADD COLUMN IF NOT EXISTS loading_charges_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS loading_price_per_ton NUMERIC(12,2),
+  ADD COLUMN IF NOT EXISTS loading_charges_amount NUMERIC(12,2) NOT NULL DEFAULT 0;

@@ -17,6 +17,8 @@ public class InvoiceDtos {
         String customerAddress;
         String notes;
         Boolean heightEnabled;
+        Boolean loadingChargesEnabled;
+        BigDecimal loadingPricePerTon;
         List<InvoiceItemRequest> items;
         Boolean shouldFinalize;
     }
@@ -28,6 +30,8 @@ public class InvoiceDtos {
         String customerAddress;
         String notes;
         Boolean heightEnabled;
+        Boolean loadingChargesEnabled;
+        BigDecimal loadingPricePerTon;
         List<InvoiceItemRequest> items;
         Boolean shouldFinalize;
     }
@@ -66,6 +70,9 @@ public class InvoiceDtos {
         String nurseryPhone;
         String nurseryOwnerName;
         List<InvoiceItemResponse> items;
+        Boolean loadingChargesEnabled;
+        BigDecimal loadingPricePerTon;
+        BigDecimal loadingChargesAmount;
         BigDecimal totalAmount;
         OffsetDateTime finalizedAt;
         OffsetDateTime createdAt;

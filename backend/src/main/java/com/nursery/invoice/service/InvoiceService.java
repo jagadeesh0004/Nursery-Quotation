@@ -2,16 +2,20 @@ package com.nursery.invoice.service;
 
 import com.nursery.common.exception.BusinessException;
 import com.nursery.common.exception.ResourceNotFoundException;
+import com.nursery.common.response.PageResponse;
 import com.nursery.invoice.Invoice;
 import com.nursery.invoice.InvoiceItem;
 import com.nursery.invoice.InvoiceRepository;
+import com.nursery.invoice.InvoiceStatus;
 import com.nursery.invoice.dto.InvoiceDtos.*;
 import com.nursery.invoice.mapper.InvoiceMapper;
 import com.nursery.invoice.numbering.InvoiceNumberingService;
+import com.nursery.plant.service.PlantService;
 import com.nursery.profile.NurseryProfile;
 import com.nursery.profile.NurseryProfileRepository;
 import com.nursery.quotation.Quotation;
 import com.nursery.quotation.QuotationRepository;
+import com.nursery.quotation.service.CalculationEngine;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -39,6 +43,10 @@ public class InvoiceService {
     private final QuotationRepository quotationRepository;
     private final NurseryProfileRepository profileRepository;
     private final InvoiceNumberingService numberingService;
+    private final CalculationEngine calculationEngine;
+    private final PlantService plantService;
+
+    // ─── Create ──────────────────────────────────────────────────────
 
     @Transactional
     public InvoiceResponse createInvoice(UUID userId, CreateInvoiceRequest request) {
@@ -60,12 +68,15 @@ public class InvoiceService {
                 .customerAddress(request.getCustomerAddress())
                 .notes(request.getNotes())
                 .heightEnabled(Boolean.TRUE.equals(request.getHeightEnabled()))
+            .loadingChargesEnabled(Boolean.TRUE.equals(request.getLoadingChargesEnabled()))
+            .loadingPricePerTon(request.getLoadingPricePerTon())
                 .year(Year.now().getValue())
                 .invoiceDate(OffsetDateTime.now())
                 .build();
 
-        applyItems(invoice, request.getItems());
-        recalculate(invoice);
+        validateLoadingCharges(finalize, invoice.isLoadingChargesEnabled(), invoice.getLoadingPricePerTon());
+        applyItems(invoice, request.getItems(), userId);
+        calculationEngine.recalculate(invoice);
 
         if (finalize) {
             assignSequence(invoice, userId);
@@ -84,18 +95,28 @@ public class InvoiceService {
     }
 
     @Transactional(readOnly = true)
-    public Page<InvoiceSummaryResponse> listInvoices(UUID userId, String search, int page, int size) {
+    public PageResponse<InvoiceSummaryResponse> listInvoices(UUID userId, String search, String status, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         NurseryProfile profile = profileRepository.findByUserId(userId).orElse(null);
-        return invoiceRepository.findByUserIdWithSearch(userId, search, pageable)
-                .map(invoice -> new InvoiceSummaryResponse(
-                        invoice.getId(),
-                        formatInvoiceNumber(profile, invoice),
-                        invoice.getStatus(),
-                        invoice.getCustomerName(),
-                        invoice.getTotalAmount(),
-                        invoice.getCreatedAt()
-                ));
+        Page<Invoice> result;
+
+        if (status != null && !status.isBlank()) {
+            InvoiceStatus parsedStatus = parseStatus(status);
+            result = invoiceRepository.findByUserIdAndStatusWithSearch(userId, parsedStatus, search, pageable);
+        } else {
+            result = invoiceRepository.findByUserIdWithSearch(userId, search, pageable);
+        }
+
+        Page<InvoiceSummaryResponse> mapped = result.map(invoice -> new InvoiceSummaryResponse(
+                invoice.getId(),
+                getInvoiceNumber(invoice, profile),
+                invoice.getStatus(),
+                invoice.getCustomerName(),
+                invoice.getTotalAmount(),
+                invoice.getCreatedAt()
+        ));
+
+        return PageResponse.from(mapped);
     }
 
     @Transactional
@@ -121,16 +142,20 @@ public class InvoiceService {
         invoice.setCustomerAddress(request.getCustomerAddress());
         invoice.setNotes(request.getNotes());
         invoice.setHeightEnabled(Boolean.TRUE.equals(request.getHeightEnabled()));
+        invoice.setLoadingChargesEnabled(Boolean.TRUE.equals(request.getLoadingChargesEnabled()));
+        invoice.setLoadingPricePerTon(request.getLoadingPricePerTon());
         if (invoice.getInvoiceDate() == null) {
             invoice.setInvoiceDate(OffsetDateTime.now());
         }
 
+        validateLoadingCharges(finalize, invoice.isLoadingChargesEnabled(), invoice.getLoadingPricePerTon());
+
         if (request.getItems() != null) {
             invoice.getItems().clear();
-            applyItems(invoice, request.getItems());
+            applyItems(invoice, request.getItems(), userId);
         }
 
-        recalculate(invoice);
+        calculationEngine.recalculate(invoice);
 
         if (finalize) {
             invoice.setStatus(com.nursery.invoice.InvoiceStatus.FINAL);
@@ -156,26 +181,58 @@ public class InvoiceService {
                 .customerAddress(source.getCustomerAddress())
                 .notes(source.getNotes())
                 .heightEnabled(source.isHeightEnabled())
+            .loadingChargesEnabled(source.isLoadingChargesEnabled())
+            .loadingPricePerTon(source.getLoadingPricePerTon())
                 .year(Year.now().getValue())
-                .totalAmount(source.getTotalAmount())
                 .invoiceDate(OffsetDateTime.now())
                 .build();
 
-        List<InvoiceItem> copied = source.getItems().stream().map(item -> InvoiceItem.builder()
-                .invoice(invoice)
-                .plantName(item.getPlantName())
-                .dimension(item.getDimension())
-                .height(item.getHeight())
-                .quantity(item.getQuantity())
-                .price(item.getPrice())
-                .itemTotal(item.getItemTotal())
-                .build()).collect(Collectors.toList());
+        List<InvoiceItem> copied = source.getItems().stream().map(item -> {
+            plantService.findOrCreatePlantWithDimension(userId, item.getPlantName(), item.getDimension());
+            return InvoiceItem.builder()
+                    .invoice(invoice)
+                    .plantName(item.getPlantName())
+                    .dimension(item.getDimension())
+                    .height(item.getHeight())
+                    .quantity(item.getQuantity())
+                    .price(item.getPrice())
+                    .itemTotal(item.getItemTotal())
+                    .build();
+        }).collect(Collectors.toList());
 
         invoice.getItems().addAll(copied);
-        recalculate(invoice);
+        calculationEngine.recalculate(invoice);
 
         Invoice saved = invoiceRepository.save(invoice);
         log.info("Invoice imported from quotation [{}] → new id: {}", quotationId, saved.getId());
+        return buildResponseWithNurseryDetails(saved);
+    }
+
+    @Transactional
+    public InvoiceResponse autoSaveDraft(UUID userId, Long invoiceId, UpdateInvoiceRequest request) {
+        Invoice invoice = findOwnedInvoice(userId, invoiceId);
+
+        if (invoice.getStatus() == InvoiceStatus.FINAL) {
+            throw new BusinessException("Cannot auto-save a finalized invoice.");
+        }
+
+        if (request.getCustomerName() != null) invoice.setCustomerName(request.getCustomerName());
+        if (request.getCustomerPhone() != null) invoice.setCustomerPhone(request.getCustomerPhone());
+        if (request.getCustomerAddress() != null) invoice.setCustomerAddress(request.getCustomerAddress());
+        if (request.getNotes() != null) invoice.setNotes(request.getNotes());
+        if (request.getHeightEnabled() != null) invoice.setHeightEnabled(request.getHeightEnabled());
+        if (request.getLoadingChargesEnabled() != null) invoice.setLoadingChargesEnabled(request.getLoadingChargesEnabled());
+        if (request.getLoadingPricePerTon() != null) invoice.setLoadingPricePerTon(request.getLoadingPricePerTon());
+
+        if (request.getItems() != null) {
+            invoice.getItems().clear();
+            applyItems(invoice, request.getItems(), userId);
+        }
+
+        calculationEngine.recalculate(invoice);
+
+        Invoice saved = invoiceRepository.save(invoice);
+        log.debug("Draft auto-saved: invoiceId={}", invoiceId);
         return buildResponseWithNurseryDetails(saved);
     }
 
@@ -187,10 +244,19 @@ public class InvoiceService {
         log.info("Invoice [{}] soft-deleted for userId: {}", invoiceId, userId);
     }
 
-    private void applyItems(Invoice invoice, List<InvoiceItemRequest> reqs) {
+    private void applyItems(Invoice invoice, List<InvoiceItemRequest> reqs, UUID userId) {
         if (reqs == null) return;
         List<InvoiceItem> items = new ArrayList<>();
         for (InvoiceItemRequest r : reqs) {
+            if (r.getPlantName() == null || r.getPlantName().isBlank()) {
+                throw new BusinessException("Plant name is required for each invoice item.");
+            }
+            if (r.getDimension() == null || r.getDimension().isBlank()) {
+                throw new BusinessException("Dimension is required for each invoice item.");
+            }
+
+            plantService.findOrCreatePlantWithDimension(userId, r.getPlantName(), r.getDimension());
+
             String height = null;
             if (invoice.isHeightEnabled()) {
                 if (r.getHeight() == null || r.getHeight().isBlank()) {
@@ -201,14 +267,17 @@ public class InvoiceService {
                 }
                 height = normalizeHeight(r.getHeight());
             }
+
+            BigDecimal price = r.getPrice() == null ? BigDecimal.ZERO : r.getPrice();
+            int quantity = r.getQuantity() == null ? 0 : r.getQuantity();
             InvoiceItem it = InvoiceItem.builder()
                     .invoice(invoice)
-                    .plantName(r.getPlantName())
-                    .dimension(r.getDimension())
+                    .plantName(r.getPlantName().trim())
+                    .dimension(r.getDimension().trim())
                     .height(height)
-                    .quantity(r.getQuantity())
-                    .price(r.getPrice())
-                    .itemTotal((r.getPrice() == null ? BigDecimal.ZERO : r.getPrice()).multiply(BigDecimal.valueOf(r.getQuantity() == null ? 0 : r.getQuantity())))
+                    .quantity(quantity)
+                    .price(price)
+                    .itemTotal(calculationEngine.calculateItemTotal(price, quantity))
                     .build();
             items.add(it);
         }
@@ -216,18 +285,27 @@ public class InvoiceService {
     }
 
     private void recalculate(Invoice invoice) {
-        BigDecimal total = invoice.getItems().stream()
-                .map(it -> it.getItemTotal() == null ? BigDecimal.ZERO : it.getItemTotal())
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        invoice.setTotalAmount(total);
+        calculationEngine.recalculate(invoice);
     }
 
     private void assignSequence(Invoice invoice, UUID userId) {
-        if (invoice.getSequence() == null) {
-            var generated = numberingService.generate(userId);
-            invoice.setYear(generated.year());
-            invoice.setSequence(generated.sequence());
+        if (invoice.getInvoiceNumber() != null && !invoice.getInvoiceNumber().isBlank()) {
+            return;
         }
+
+        if (invoice.getSequence() != null) {
+            NurseryProfile profile = profileRepository.findByUserId(userId).orElse(null);
+            String initials = profile != null && profile.getInitials() != null && !profile.getInitials().isBlank()
+                    ? profile.getInitials().toUpperCase()
+                    : "0000";
+            invoice.setInvoiceNumber(String.format("INV-%s%04d", initials, invoice.getSequence()));
+            return;
+        }
+
+        var generated = numberingService.generate(userId);
+        invoice.setInvoiceNumber(generated.invoiceNumber());
+        invoice.setYear(generated.year());
+        invoice.setSequence(generated.sequence());
     }
 
     private void validateFinalInvoiceRequest(
@@ -257,7 +335,7 @@ public class InvoiceService {
     private InvoiceResponse buildResponseWithNurseryDetails(Invoice invoice) {
         NurseryProfile profile = profileRepository.findByUserId(invoice.getUserId()).orElse(null);
         InvoiceResponse baseResponse = invoiceMapper.toResponse(invoice);
-        String invoiceNumber = formatInvoiceNumber(profile, invoice);
+        String invoiceNumber = getInvoiceNumber(invoice, profile);
 
         return new InvoiceResponse(
                 baseResponse.getId(),
@@ -273,13 +351,32 @@ public class InvoiceService {
                 profile != null ? profile.getPhone() : null,
                 profile != null ? profile.getOwnerName() : null,
                 baseResponse.getItems(),
+                baseResponse.getLoadingChargesEnabled(),
+                baseResponse.getLoadingPricePerTon(),
+                baseResponse.getLoadingChargesAmount(),
                 baseResponse.getTotalAmount(),
                 invoice.getFinalizedAt(),
                 invoice.getCreatedAt()
         );
     }
 
-    private String formatInvoiceNumber(NurseryProfile profile, Invoice invoice) {
+    private void validateLoadingCharges(boolean finalize, boolean loadingChargesEnabled, BigDecimal loadingPricePerTon) {
+        if (loadingChargesEnabled && loadingPricePerTon == null) {
+            throw new BusinessException(finalize
+                    ? "Loading price per ton is required when loading charges are enabled for a final invoice."
+                    : "Loading price per ton is required when loading charges are enabled.");
+        }
+    }
+
+    private String getInvoiceNumber(Invoice invoice, NurseryProfile profile) {
+        if (invoice.getStatus() == com.nursery.invoice.InvoiceStatus.DRAFT) {
+            return "-";
+        }
+
+        if (invoice.getInvoiceNumber() != null && !invoice.getInvoiceNumber().isBlank()) {
+            return invoice.getInvoiceNumber();
+        }
+
         if (invoice.getSequence() == null || invoice.getYear() == null) {
             return "-";
         }
@@ -288,6 +385,14 @@ public class InvoiceService {
                 ? profile.getInitials().toUpperCase()
                 : "INV";
         return String.format("INV-%s%04d", initials, invoice.getSequence());
+    }
+
+    private InvoiceStatus parseStatus(String status) {
+        try {
+            return InvoiceStatus.valueOf(status.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new BusinessException("Invalid status. Must be DRAFT or FINAL.");
+        }
     }
 
     private boolean isValidHeightFormat(String height) {

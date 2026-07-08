@@ -28,10 +28,18 @@ public class InvoiceController {
 
     @GetMapping
     public ResponseEntity<ApiResponse<?>> list(@RequestParam(required = false) String search,
+                                                @RequestParam(required = false) String status,
                                                 @RequestParam(defaultValue = "0") int page,
                                                 @RequestParam(defaultValue = "10") int size) {
         UUID userId = SecurityUtils.getCurrentUserId();
-        return ResponseEntity.ok(ApiResponse.ok(invoiceService.listInvoices(userId, search, page, size)));
+        return ResponseEntity.ok(ApiResponse.ok(invoiceService.listInvoices(userId, search, status, page, size)));
+    }
+
+    @PatchMapping("/{id}/auto-save")
+    public ResponseEntity<ApiResponse<?>> autoSave(@PathVariable Long id,
+                                                   @RequestBody UpdateInvoiceRequest request) {
+        UUID userId = SecurityUtils.getCurrentUserId();
+        return ResponseEntity.ok(ApiResponse.ok("Draft saved", invoiceService.autoSaveDraft(userId, id, request)));
     }
 
     @GetMapping("/{id}")

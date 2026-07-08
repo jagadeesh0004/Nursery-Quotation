@@ -46,6 +46,10 @@ public class QuotationDtos {
 
             Boolean heightEnabled,
 
+            Boolean loadingChargesEnabled,
+
+            BigDecimal loadingPricePerTon,
+
             @Valid
             List<QuotationItemRequest> items,
 
@@ -60,6 +64,10 @@ public class QuotationDtos {
             String notes,
 
             Boolean heightEnabled,
+
+            Boolean loadingChargesEnabled,
+
+            BigDecimal loadingPricePerTon,
 
             @Valid
             List<QuotationItemRequest> items,
@@ -93,6 +101,9 @@ public class QuotationDtos {
             String nurseryPhone,
             String nurseryOwnerName,
             List<QuotationItemResponse> items,
+            Boolean loadingChargesEnabled,
+            BigDecimal loadingPricePerTon,
+            BigDecimal loadingChargesAmount,
             BigDecimal totalAmount,
             String publicToken,
             OffsetDateTime finalizedAt,

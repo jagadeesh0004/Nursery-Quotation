@@ -47,19 +47,31 @@ import java.util.regex.Pattern;
 /**
  * Generates Quotation and Invoice PDFs.
  *
- * <p>Both document types share a single HTML/CSS layout engine ({@link #buildDocumentHtml}
- * and its section builders) so that header, customer block, items table, totals, signature
- * and footer stay pixel-identical between the two documents. Only the color {@link PdfTheme}
- * and the small set of fields called out in the spec (title, document number/date, notes,
+ * <p>
+ * Both document types share a single HTML/CSS layout engine
+ * ({@link #buildDocumentHtml}
+ * and its section builders) so that header, customer block, items table,
+ * totals, signature
+ * and footer stay pixel-identical between the two documents. Only the color
+ * {@link PdfTheme}
+ * and the small set of fields called out in the spec (title, document
+ * number/date, notes,
  * quotation totals vs. invoice status) differ.
  *
- * <p>Retained behaviour from the previous implementation: rate limiting on all public
- * generation entry points, HTTPS-only + circular-crop logo downloading with caching,
+ * <p>
+ * Retained behaviour from the previous implementation: rate limiting on all
+ * public
+ * generation entry points, HTTPS-only + circular-crop logo downloading with
+ * caching,
  * placeholder logo fallback, and all quantity/weight/money calculations.
  *
- * <p>New in this revision: proper embedded Unicode font support so Telugu text (customer
- * names, addresses, notes, plant names) renders correctly alongside English text, without
- * being rasterized to an image — copy/paste and text search inside the PDF keep working.
+ * <p>
+ * New in this revision: proper embedded Unicode font support so Telugu text
+ * (customer
+ * names, addresses, notes, plant names) renders correctly alongside English
+ * text, without
+ * being rasterized to an image — copy/paste and text search inside the PDF keep
+ * working.
  */
 @Slf4j
 @Service
@@ -71,9 +83,7 @@ public class PdfGenerationService {
     private final NurseryProfileRepository profileRepository;
     private final ChromiumPdfService chromiumPdfService;
 
-
-    private static final String NOTO_TELUGU_BASE64 =
-        FontUtil.loadFontAsBase64("fonts/NotoSansTelugu-Regular.ttf");
+    private static final String NOTO_TELUGU_BASE64 = FontUtil.loadFontAsBase64("fonts/NotoSansTelugu-Regular.ttf");
 
     // ------------------------------------------------------------------
     // Formatting constants
@@ -96,6 +106,7 @@ public class PdfGenerationService {
     // ------------------------------------------------------------------
 
     private static final String TEXT_PRIMARY = "#333333";
+    private static final String TEXT_BODY = "#111111";
     private static final String TEXT_MUTED = "#666666";
     private static final String BORDER_LIGHT = "#e0e0e0";
     private static final String ROW_ALT_BG = "#fafbfc";
@@ -107,15 +118,20 @@ public class PdfGenerationService {
     // ------------------------------------------------------------------
 
     /**
-     * Classpath location of the embedded Unicode font. Add a Telugu-capable TrueType/OpenType
-     * font here (e.g. Noto Sans Telugu, which also covers Latin script for mixed English +
+     * Classpath location of the embedded Unicode font. Add a Telugu-capable
+     * TrueType/OpenType
+     * font here (e.g. Noto Sans Telugu, which also covers Latin script for mixed
+     * English +
      * Telugu text) under {@code src/main/resources/fonts/}.
      */
     private static final String UNICODE_FONT_RESOURCE = "/fonts/NotoSansTelugu-Regular.ttf";
     private static final String UNICODE_FONT_FAMILY = "NotoSansTelugu";
 
-    /** Flying Saucer's font resolver needs a real file path, so the classpath font is
-     *  materialized once to a temp file and reused for the life of the JVM. */
+    /**
+     * Flying Saucer's font resolver needs a real file path, so the classpath font
+     * is
+     * materialized once to a temp file and reused for the life of the JVM.
+     */
     private static volatile File cachedUnicodeFontFile;
 
     // ==================================================================
@@ -190,16 +206,18 @@ public class PdfGenerationService {
     // ==================================================================
 
     private byte[] renderPdf(String html, String failureMessage) {
-    try {
-        return chromiumPdfService.generatePdf(html);
-    } catch (Exception e) {
-        throw new RuntimeException(failureMessage, e);
+        try {
+            return chromiumPdfService.generatePdf(html);
+        } catch (Exception e) {
+            throw new RuntimeException(failureMessage, e);
+        }
     }
-}
 
     /**
-     * Registers the embedded Unicode font with Flying Saucer's font resolver so that Telugu
-     * (and any other Unicode) glyphs are embedded directly as text - never rasterized - keeping
+     * Registers the embedded Unicode font with Flying Saucer's font resolver so
+     * that Telugu
+     * (and any other Unicode) glyphs are embedded directly as text - never
+     * rasterized - keeping
      * the PDF searchable and its text selectable/copyable.
      */
     private void registerUnicodeFont(ITextRenderer renderer) {
@@ -210,11 +228,12 @@ public class PdfGenerationService {
                     UNICODE_FONT_FAMILY,
                     BaseFont.IDENTITY_H,
                     BaseFont.EMBEDDED,
-                    null
-            );
+                    null);
         } catch (Exception ex) {
-            // Fall back silently to the renderer's default fonts. English content will still
-            // render correctly; only Telugu glyphs would be affected, so we log and continue
+            // Fall back silently to the renderer's default fonts. English content will
+            // still
+            // render correctly; only Telugu glyphs would be affected, so we log and
+            // continue
             // rather than failing PDF generation.
             log.warn("Unicode font could not be registered ({}); Telugu text may not render "
                     + "correctly until a font is added at classpath:{}", ex.getMessage(), UNICODE_FONT_RESOURCE);
@@ -243,35 +262,47 @@ public class PdfGenerationService {
     // Theme + document model
     // ==================================================================
 
-    /** Color palette for one document type. Everything outside this palette (text colors,
-     *  borders, row striping) is shared between Quotation and Invoice. */
+    /**
+     * Color palette for one document type. Everything outside this palette (text
+     * colors,
+     * borders, row striping) is shared between Quotation and Invoice.
+     */
     private record PdfTheme(String primary, String primaryDark, String tableHeaderBorder,
-                             String lightBg, String totalBoxBg, String totalBoxBorder) {
+            String lightBg, String totalBoxBg, String totalBoxBorder) {
     }
 
     // Quotation palette - professional slate/blue.
-    private static final PdfTheme QUOTATION_THEME =
-            new PdfTheme("#1565c0", "#0d47a1", "#42a5f5", "#f5f7fa", "#eef3fb", "#c7d7ef");
+    private static final PdfTheme QUOTATION_THEME = new PdfTheme("#1565c0", "#0d47a1", "#42a5f5", "#f5f7fa", "#eef3fb",
+            "#c7d7ef");
 
-    // Invoice palette - nursery green. Intentionally different from the Quotation blues per
-    // spec. Adjust these six values if your application already has a different invoice
+    // Invoice palette - nursery green. Intentionally different from the Quotation
+    // blues per
+    // spec. Adjust these six values if your application already has a different
+    // invoice
     // brand color; every invoice visual derives from this one record.
-    private static final PdfTheme INVOICE_THEME =
-            new PdfTheme("#2e7d32", "#1b5e20", "#4caf50", "#f5f7f5", "#f1f8f1", "#d0e7d2");
+    private static final PdfTheme INVOICE_THEME = new PdfTheme("#2e7d32", "#1b5e20", "#4caf50", "#f5f7f5", "#f1f8f1",
+            "#d0e7d2");
 
-    /** One row in the items table. Both {@code QuotationItem} and {@code InvoiceItem} are
-     *  mapped into this common shape so a single table builder can render either. */
+    /**
+     * One row in the items table. Both {@code QuotationItem} and
+     * {@code InvoiceItem} are
+     * mapped into this common shape so a single table builder can render either.
+     */
     private record LineItem(String plantName, String dimension, String height,
-                             int quantity, BigDecimal price, BigDecimal itemTotal) {
+            int quantity, BigDecimal price, BigDecimal itemTotal) {
     }
 
-    /** A single label/value pair shown in the "Quotation Details" / "Invoice Details" box. */
+    /**
+     * A single label/value pair shown in the "Quotation Details" / "Invoice
+     * Details" box.
+     */
     private record InfoRow(String label, String value) {
     }
 
     /**
      * Everything the shared layout builders need. Populated once per document by
-     * {@link #buildQuotationContext} or {@link #buildInvoiceContext}; the section builders
+     * {@link #buildQuotationContext} or {@link #buildInvoiceContext}; the section
+     * builders
      * only ever read from this object, never branch on "is this a quotation".
      */
     private static final class DocumentContext {
@@ -312,7 +343,7 @@ public class PdfGenerationService {
     // ==================================================================
 
     private DocumentContext buildQuotationContext(Quotation quotation, NurseryProfile profile,
-                                                   int totalQuantity, double totalNetWeight) {
+            int totalQuantity, double totalNetWeight) {
         DocumentContext ctx = new DocumentContext();
         ctx.theme = QUOTATION_THEME;
         ctx.documentTitle = "QUOTATION";
@@ -326,16 +357,19 @@ public class PdfGenerationService {
         ctx.documentInfoHeading = "Quotation Details";
         ctx.documentInfoRows = List.of(
                 new InfoRow("Quote ID:", e(d(quotation.getQuotationNumber()))),
-                new InfoRow("Date:", formatDate(quotation.getCreatedAt()))
-        );
+                new InfoRow("Date:", formatDate(quotation.getCreatedAt())));
 
         ctx.heightEnabled = quotation.isHeightEnabled();
         ctx.lineItems = mapQuotationItems(quotation.getItems());
 
-        ctx.totalsSummaryLines = List.of(
-                "Total Quantity: <strong>" + totalQuantity + "</strong>",
-                "Total Weight: <strong>" + formatWeight(totalNetWeight) + "</strong>"
-        );
+        List<String> quotationSummaryLines = new ArrayList<>();
+        quotationSummaryLines.add("Total Quantity: <strong>" + totalQuantity + "</strong>");
+        quotationSummaryLines.add("Total Weight: <strong>" + formatWeight(totalNetWeight) + "</strong>");
+        if (quotation.isLoadingChargesEnabled()) {
+            quotationSummaryLines
+                    .add("Loading Charges: <strong>" + formatMoney(quotation.getLoadingChargesAmount()) + "</strong>");
+        }
+        ctx.totalsSummaryLines = quotationSummaryLines;
         ctx.totalAmount = formatMoney(quotation.getTotalAmount());
         ctx.notes = e(quotation.getNotes());
 
@@ -343,7 +377,7 @@ public class PdfGenerationService {
     }
 
     private DocumentContext buildInvoiceContext(Invoice invoice, NurseryProfile profile,
-                                                 int totalQuantity, double totalNetWeight) {
+            int totalQuantity, double totalNetWeight) {
         DocumentContext ctx = new DocumentContext();
         ctx.theme = INVOICE_THEME;
         ctx.documentTitle = "INVOICE";
@@ -354,9 +388,9 @@ public class PdfGenerationService {
         ctx.customerPhone = e(d(invoice.getCustomerPhone()));
         ctx.customerAddress = e(d(invoice.getCustomerAddress()));
 
-        String invoiceNumber = invoice.getSequence() == null
-                ? "DRAFT-" + invoice.getId()
-                : String.format(Locale.US, "INV-%04d", invoice.getSequence());
+        String invoiceNumber = invoice.getInvoiceNumber() != null && !invoice.getInvoiceNumber().isBlank()
+                ? invoice.getInvoiceNumber()
+                : "-";
         OffsetDateTime effectiveDate = invoice.getInvoiceDate() != null
                 ? invoice.getInvoiceDate()
                 : (invoice.getFinalizedAt() != null ? invoice.getFinalizedAt() : invoice.getCreatedAt());
@@ -364,16 +398,19 @@ public class PdfGenerationService {
         ctx.documentInfoHeading = "Invoice Details";
         ctx.documentInfoRows = List.of(
                 new InfoRow("Invoice:", e(invoiceNumber)),
-                new InfoRow("Date:", formatDate(effectiveDate))
-        );
+                new InfoRow("Date:", formatDate(effectiveDate)));
 
         ctx.heightEnabled = invoice.isHeightEnabled();
         ctx.lineItems = mapInvoiceItems(invoice.getItems());
 
-        ctx.totalsSummaryLines = List.of(
-                "Total Quantity: <strong>" + totalQuantity + "</strong>",
-                "Total Weight: <strong>" + formatWeight(totalNetWeight) + "</strong>"
-        );
+        List<String> invoiceSummaryLines = new ArrayList<>();
+        invoiceSummaryLines.add("Total Quantity: <strong>" + totalQuantity + "</strong>");
+        invoiceSummaryLines.add("Total Weight: <strong>" + formatWeight(totalNetWeight) + "</strong>");
+        if (invoice.isLoadingChargesEnabled()) {
+            invoiceSummaryLines
+                    .add("Loading Charges: <strong>" + formatMoney(invoice.getLoadingChargesAmount()) + "</strong>");
+        }
+        ctx.totalsSummaryLines = invoiceSummaryLines;
         ctx.totalAmount = formatMoney(invoice.getTotalAmount());
         ctx.notes = e(invoice.getNotes());
 
@@ -401,8 +438,7 @@ public class PdfGenerationService {
                     e(d(item.getHeight())),
                     item.getQuantity() == null ? 0 : item.getQuantity(),
                     item.getPrice(),
-                    item.getItemTotal()
-            ));
+                    item.getItemTotal()));
         }
         return mapped;
     }
@@ -419,8 +455,7 @@ public class PdfGenerationService {
                     e(d(item.getHeight())),
                     item.getQuantity() == null ? 0 : item.getQuantity(),
                     item.getPrice(),
-                    item.getItemTotal()
-            ));
+                    item.getItemTotal()));
         }
         return mapped;
     }
@@ -452,76 +487,88 @@ public class PdfGenerationService {
     }
 
     /**
-     * One stylesheet structure shared by both document types; only the theme colors passed in
-     * change per render. Keeping this as a single method - rather than duplicating the CSS in
-     * two builder methods - is what keeps the Quotation and Invoice layouts identical.
+     * One stylesheet structure shared by both document types; only the theme colors
+     * passed in
+     * change per render. Keeping this as a single method - rather than duplicating
+     * the CSS in
+     * two builder methods - is what keeps the Quotation and Invoice layouts
+     * identical.
      */
-   private String buildStyleSheet(PdfTheme theme) {
+    private String buildStyleSheet(PdfTheme theme) {
+        return "@font-face {"
+                + "font-family:'NotoSansTelugu';"
+                + "src:url(data:font/truetype;base64,"
+                + NOTO_TELUGU_BASE64
+                + ") format('truetype');"
+                + "font-weight:normal;"
+                + "font-style:normal;"
+                + "}"
 
-    return "@font-face {"
-            + "font-family:'NotoSansTelugu';"
-            + "src:url(data:font/truetype;base64,"
-            + NOTO_TELUGU_BASE64
-            + ") format('truetype');"
-            + "font-weight:normal;"
-            + "font-style:normal;"
-            + "}"
+                // (Optional) If you add a real Bold/SemiBold font file under
+                // src/main/resources/fonts/, register it here with font-weight:700 so
+                // the renderer embeds the authentic bold glyphs. Leaving a single
+                // @font-face for the regular file keeps Telugu + Latin rendering stable.
+                + "body {"
+                + "margin:0;"
+                + "padding:0;"
+                + "font-family:'NotoSansTelugu','Helvetica Neue',Helvetica,Arial,sans-serif;"
+                + "font-size:12px;"
+                + "color:" + TEXT_PRIMARY + ";"
+                + "background:#fff;"
+                + "}"
 
-            + "body {"
-            + "margin:0;"
-            + "padding:0;"
-            + "font-family:'NotoSansTelugu','Helvetica Neue',Helvetica,Arial,sans-serif;"
-            + "font-size:12px;"
-            + "color:" + TEXT_PRIMARY + ";"
-            + "background:#fff;"
-            + "}"
+                + "@page {"
+                + "size:A4;"
+                + "margin:20px " + PAGE_SIDE_MARGIN + ";"
+                + "padding:0;"
+                + "}"
 
-            + "@page {"
-            + "size:A4;"
-            + "margin:20px " + PAGE_SIDE_MARGIN + ";"
-            + "padding:0;"
-            + "}"
+                + "* {"
+                + "margin:0;"
+                + "padding:0;"
+                + "}"
 
-            + "* {"
-            + "margin:0;"
-            + "padding:0;"
-            + "}"
+                + "table {"
+                + "page-break-inside:auto;"
+                + "margin:0;"
+                + "border-collapse:collapse;"
+                + "}"
 
-            + "table {"
-            + "page-break-inside:auto;"
-            + "margin:0;"
-            + "border-collapse:collapse;"
-            + "}"
+                + "tr {"
+                + "page-break-inside:avoid;"
+                + "page-break-after:auto;"
+                + "}"
 
-            + "tr {"
-            + "page-break-inside:avoid;"
-            + "page-break-after:auto;"
-            + "}"
+                + "thead { display:table-header-group; }"
+                + "tfoot { display:table-footer-group; }"
 
-            + "thead { display:table-header-group; }"
-            + "tfoot { display:table-footer-group; }"
+                + "div {"
+                + "margin:0;"
+                + "padding:0;"
+                + "}"
 
-            + "div {"
-            + "margin:0;"
-            + "padding:0;"
-            + "}"
+                + "#footer {"
+                + "text-align:center;"
+                + "padding:20px 0;"
+                + "border-top:1px solid " + FOOTER_BORDER + ";"
+                + "color:" + TEXT_MUTED + ";"
+                + "font-size:11px;"
+                + "margin-top:20px;"
+                + "page-break-inside:avoid;"
+                + "}"
 
-            + "#footer {"
-            + "text-align:center;"
-            + "padding:20px 0;"
-            + "border-top:1px solid " + FOOTER_BORDER + ";"
-            + "color:" + TEXT_MUTED + ";"
-            + "font-size:11px;"
-            + "margin-top:20px;"
-            + "page-break-inside:avoid;"
-            + "}";
-}
+                // Values in the left-hand totals summary use a <strong> wrapper for the
+                // numeric values; make those values darker and bolder for readability.
+                + ".totals-summary strong { color: " + TEXT_BODY + "; font-weight:700; }";
+    }
 
     // ------------------------------------------------------------------
     // Shared inline-style fragments
     //
-    // These centralize repeated declarations as plain Java strings rather than CSS classes,
-    // so the borders/margins/padding stay byte-for-byte identical between Quotation and
+    // These centralize repeated declarations as plain Java strings rather than CSS
+    // classes,
+    // so the borders/margins/padding stay byte-for-byte identical between Quotation
+    // and
     // Invoice without depending on class-selector cascade behaviour.
     // ------------------------------------------------------------------
 
@@ -539,25 +586,33 @@ public class PdfGenerationService {
     }
 
     private String itemsWrapperStyle() {
-        // Only spacing now - the table itself (not this wrapper) owns the border, so there is
-        // no second border box that can misalign with the table's own collapsed cell borders.
+        // Only spacing now - the table itself (not this wrapper) owns the border, so
+        // there is
+        // no second border box that can misalign with the table's own collapsed cell
+        // borders.
         return "margin:20px 0 12px 0;";
     }
 
     private String tableHeaderCellStyle(PdfTheme theme) {
         // Every header cell declares a full 1px border on all four sides. With
-        // border-collapse:collapse on the <table>, adjacent cells merge their shared edge into
-        // a single line automatically, so no per-column "none" suppression is needed - that is
+        // border-collapse:collapse on the <table>, adjacent cells merge their shared
+        // edge into
+        // a single line automatically, so no per-column "none" suppression is needed -
+        // that is
         // what previously produced gaps/uneven thickness at the header/table boundary.
         return "color:#fff; font-size:11px; font-weight:bold; text-transform:uppercase; padding:12px 8px; "
                 + "background:" + theme.primary() + "; border:1px solid " + theme.tableHeaderBorder() + ";";
     }
 
     private String tableBodyCellStyle() {
-        // Same principle as the header cells: a full, uniform border on every side of every
-        // cell. border-collapse takes care of merging identical adjacent edges into one clean
-        // line, and the outermost cells' borders become the table's visible outer frame.
-        return "padding:12px 8px; font-size:12px; color:" + TEXT_PRIMARY + "; border:1px solid " + BORDER_LIGHT + ";";
+        // Same principle as the header cells: a full, uniform border on every side of
+        // every
+        // cell. border-collapse takes care of merging identical adjacent edges into one
+        // clean
+        // line, and the outermost cells' borders become the table's visible outer
+        // frame.
+        return "padding:12px 8px; font-size:12px; font-weight:600; color:" + TEXT_BODY + "; border:1px solid "
+                + BORDER_LIGHT + ";";
     }
 
     private String totalBoxStyle(PdfTheme theme) {
@@ -578,9 +633,11 @@ public class PdfGenerationService {
         sb.append("<td width=\"100\" valign=\"top\" style=\"padding-right:16px;text-align:left;\">")
                 .append(ctx.logoTag).append("</td>");
         sb.append("<td valign=\"top\" style=\"text-align:left; padding-top:4px;\">");
-        sb.append("<div style=\"font-size:28px; font-weight:700; letter-spacing:0.2px; color:").append(ctx.theme.primary())
+        sb.append("<div style=\"font-size:28px; font-weight:800; letter-spacing:0.2px; color:")
+                .append(ctx.theme.primary())
                 .append("; margin-bottom:6px;\">").append(ctx.nurseryName).append("</div>");
-        sb.append("<div style=\"font-size:13px; line-height:1.4; margin-bottom:6px; ").append(mutedStyle()).append("\">")
+        sb.append("<div style=\"font-size:13px; line-height:1.4; margin-bottom:6px; ").append(mutedStyle())
+                .append("\">")
                 .append("All Varieties of Fruits, Flowers &amp; Ornamental Plants</div>");
         sb.append("<div style=\"font-size:12px;\">").append(ctx.address).append("</div>");
         sb.append("</td>");
@@ -589,7 +646,8 @@ public class PdfGenerationService {
         sb.append(headerContactRow("Proprietor:", ctx.ownerName));
         sb.append(headerContactRow("Tel:", ctx.phone));
         sb.append("<tr><td style=\"font-size:12px; padding-right:8px; ").append(mutedStyle()).append("\">Email:</td>")
-                .append("<td style=\"font-size:12px;line-height:1.5; font-weight:600;\">").append(ctx.email).append("</td></tr>");
+                .append("<td style=\"font-size:12px;line-height:1.5; font-weight:600;\">").append(ctx.email)
+                .append("</td></tr>");
         sb.append("</table>");
         sb.append("</td>");
         sb.append("</tr></table>");
@@ -607,7 +665,7 @@ public class PdfGenerationService {
 
     private String buildDocumentTitle(DocumentContext ctx) {
         return "<div style=\"text-align:center; margin-top:20px; margin-bottom:16px; page-break-inside:avoid;\">"
-                + "<div style=\"font-size:22px; font-weight:bold; color:" + ctx.theme.primary()
+                + "<div style=\"font-size:22px; font-weight:800; color:" + ctx.theme.primary()
                 + "; letter-spacing:1px;\">" + ctx.documentTitle + "</div>"
                 + "</div>";
     }
@@ -632,10 +690,14 @@ public class PdfGenerationService {
 
     private String buildCustomerSection(DocumentContext ctx) {
         // The background/padding/border-radius now live on the containing <td> (see
-        // buildCustomerAndInfoRow) rather than on a nested <div>. Both cells sit in the same
-        // <tr>, so table row layout automatically stretches them to equal height regardless of
-        // how many rows either box has - and since the styling is on the cell itself, the
-        // colored box visibly fills that full matched height instead of only wrapping its own
+        // buildCustomerAndInfoRow) rather than on a nested <div>. Both cells sit in the
+        // same
+        // <tr>, so table row layout automatically stretches them to equal height
+        // regardless of
+        // how many rows either box has - and since the styling is on the cell itself,
+        // the
+        // colored box visibly fills that full matched height instead of only wrapping
+        // its own
         // content height.
         StringBuilder sb = new StringBuilder();
         sb.append("<div style=\"").append(infoBoxTitleStyle(ctx.theme)).append("\">Customer Details</div>");
@@ -672,12 +734,18 @@ public class PdfGenerationService {
     private String buildItemsTable(DocumentContext ctx) {
         StringBuilder sb = new StringBuilder();
         sb.append("<div style=\"").append(itemsWrapperStyle()).append("\">");
-        // The table's own cells (not an outer border on the <table> element itself) form the
-        // visible frame. Flying Saucer's border-collapse implementation does not cleanly merge
-        // a table-level border with already-collapsed cell borders - it was adding that width
-        // on top of the collapsed cells instead of into them, inflating the table past 100%
-        // width and pushing the whole page's content past the A4 boundary. Every cell already
-        // declares a full border on all sides, so collapse alone produces a clean, flush frame.
+        // The table's own cells (not an outer border on the <table> element itself)
+        // form the
+        // visible frame. Flying Saucer's border-collapse implementation does not
+        // cleanly merge
+        // a table-level border with already-collapsed cell borders - it was adding that
+        // width
+        // on top of the collapsed cells instead of into them, inflating the table past
+        // 100%
+        // width and pushing the whole page's content past the A4 boundary. Every cell
+        // already
+        // declares a full border on all sides, so collapse alone produces a clean,
+        // flush frame.
         sb.append("<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"border-collapse:collapse; ")
                 .append("page-break-inside:auto;\">");
         sb.append(buildItemsTableHeader(ctx.theme, ctx.heightEnabled));
@@ -730,13 +798,18 @@ public class PdfGenerationService {
         StringBuilder sb = new StringBuilder();
         sb.append("<tr style=\"background:").append(rowBg).append(";\">");
         sb.append("<td style=\"text-align:center; ").append(bodyCell).append("\">").append(rowNumber).append("</td>");
-        sb.append("<td style=\"text-align:left; ").append(bodyCell).append("\">").append(item.plantName()).append("</td>");
-        sb.append("<td style=\"text-align:center; ").append(bodyCell).append("\">").append(item.dimension()).append("</td>");
+        sb.append("<td style=\"text-align:left; ").append(bodyCell).append("\">").append(item.plantName())
+                .append("</td>");
+        sb.append("<td style=\"text-align:center; ").append(bodyCell).append("\">").append(item.dimension())
+                .append("</td>");
         if (heightEnabled) {
-            sb.append("<td style=\"text-align:center; ").append(bodyCell).append("\">").append(item.height()).append("</td>");
+            sb.append("<td style=\"text-align:center; ").append(bodyCell).append("\">").append(item.height())
+                    .append("</td>");
         }
-        sb.append("<td style=\"text-align:right; ").append(bodyCell).append("\">").append(item.quantity()).append("</td>");
-        sb.append("<td style=\"text-align:right; ").append(bodyCell).append("\">").append(formatMoney(item.price())).append("</td>");
+        sb.append("<td style=\"text-align:right; ").append(bodyCell).append("\">").append(item.quantity())
+                .append("</td>");
+        sb.append("<td style=\"text-align:right; ").append(bodyCell).append("\">").append(formatMoney(item.price()))
+                .append("</td>");
         sb.append("<td style=\"text-align:right; font-weight:500; ").append(bodyCell).append("\">")
                 .append(formatMoney(item.itemTotal())).append("</td>");
         sb.append("</tr>");
@@ -754,7 +827,8 @@ public class PdfGenerationService {
         sb.append("<tr>");
         sb.append("<td width=\"70%\" valign=\"top\" style=\"padding-top:16px;\">");
         for (String line : ctx.totalsSummaryLines) {
-            sb.append("<div style=\"font-size:12px; margin-bottom:6px; ").append(mutedStyle()).append("\">")
+            sb.append("<div class=\"totals-summary\" style=\"font-size:12px; margin-bottom:6px; ")
+                    .append(mutedStyle()).append("\">")
                     .append(line).append("</div>");
         }
         sb.append("</td>");
@@ -786,7 +860,8 @@ public class PdfGenerationService {
         sb.append("<tr>");
         sb.append("<td width=\"35%\" valign=\"bottom\">").append(buildNotesSection(ctx, showNotes)).append("</td>");
         sb.append("<td width=\"30%\"></td>");
-        sb.append("<td width=\"35%\" valign=\"bottom\" align=\"right\">").append(buildSignatureSection(ctx)).append("</td>");
+        sb.append("<td width=\"35%\" valign=\"bottom\" align=\"right\">").append(buildSignatureSection(ctx))
+                .append("</td>");
         sb.append("</tr></table>");
         return sb.toString();
     }
@@ -804,7 +879,8 @@ public class PdfGenerationService {
     private String buildSignatureSection(DocumentContext ctx) {
         StringBuilder sb = new StringBuilder();
         sb.append("<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\">");
-        sb.append("<tr><td style=\"border-bottom:2px solid ").append(TEXT_PRIMARY).append("; height:70px;\"></td></tr>");
+        sb.append("<tr><td style=\"border-bottom:2px solid ").append(TEXT_PRIMARY)
+                .append("; height:70px;\"></td></tr>");
         sb.append("<tr><td style=\"text-align:right; font-size:13px; font-weight:bold; padding-top:8px;\">")
                 .append("Authorized Signature</td></tr>");
         sb.append("<tr><td style=\"text-align:right; font-size:11px; padding-top:4px; ").append(mutedStyle())
@@ -860,9 +936,12 @@ public class PdfGenerationService {
     }
 
     /**
-     * Downloads an image from a URL and returns it as a circular-cropped PNG, base64-encoded.
-     * Results are cached for 24 hours (see the "logos" cache config) to avoid repeated downloads.
-     * SECURITY: HTTPS-only to reduce SSRF risk; callers must not pass user-controlled schemes.
+     * Downloads an image from a URL and returns it as a circular-cropped PNG,
+     * base64-encoded.
+     * Results are cached for 24 hours (see the "logos" cache config) to avoid
+     * repeated downloads.
+     * SECURITY: HTTPS-only to reduce SSRF risk; callers must not pass
+     * user-controlled schemes.
      */
     @Cacheable(value = "logos", key = "#imageUrl", unless = "#result == null")
     private String downloadImageAsBase64(String imageUrl) throws Exception {
@@ -1013,7 +1092,8 @@ public class PdfGenerationService {
             }
         }
 
-        // Fallback: extract first number and use it directly (matches frontend behaviour).
+        // Fallback: extract first number and use it directly (matches frontend
+        // behaviour).
         Matcher m = FIRST_NUMBER_PATTERN.matcher(k);
         if (m.find()) {
             try {
@@ -1038,7 +1118,10 @@ public class PdfGenerationService {
         return v.isEmpty() ? "-" : v;
     }
 
-    /** HTML-escapes a value; returns empty string for null/blank/empty-array-looking values. */
+    /**
+     * HTML-escapes a value; returns empty string for null/blank/empty-array-looking
+     * values.
+     */
     private String e(String v) {
         if (v == null || v.isBlank() || v.equals("[]")) {
             return "";

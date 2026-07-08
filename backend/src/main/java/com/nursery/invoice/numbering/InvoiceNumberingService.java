@@ -27,11 +27,23 @@ public class InvoiceNumberingService {
                         "Nursery profile not set up. Please complete your profile before finalizing invoices."));
 
         int baseSequence = invoiceRepository.findMaxSequenceForUserAndYear(userId, currentYear);
-        String initials = profile.getInitials().toUpperCase();
-        int nextSequence = baseSequence + 1;
-        String number = String.format("INV-%s%04d", initials, nextSequence);
-        log.debug("Generated invoice number: {} for userId: {}", number, userId);
-        return new GeneratedNumber(number, currentYear, nextSequence);
+        String initials = profile.getInitials() != null && !profile.getInitials().isBlank()
+                ? profile.getInitials().toUpperCase()
+                : "0000";
+
+        int attempt = 0;
+        while (attempt < 5) {
+            int nextSequence = baseSequence + 1 + attempt;
+            String number = String.format("INV-%s%04d", initials, nextSequence);
+            if (!invoiceRepository.existsByUserIdAndInvoiceNumber(userId, number)) {
+                log.debug("Generated invoice number: {} for userId: {}", number, userId);
+                return new GeneratedNumber(number, currentYear, nextSequence);
+            }
+            log.debug("Invoice number {} already exists for userId={}, trying next sequence...", number, userId);
+            attempt++;
+        }
+
+        throw new BusinessException("Unable to generate a unique invoice number. Please try again.");
     }
 
     public record GeneratedNumber(String invoiceNumber, int year, int sequence) {}

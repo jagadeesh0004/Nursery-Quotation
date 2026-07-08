@@ -179,6 +179,14 @@ export default function PublicQuotationPage() {
                   <span className="text-sm font-semibold text-muted uppercase tracking-widest">Net Weight</span>
                   <span className="text-xl font-bold text-ink font-mono">{formatWeight(totalNetWeight)}</span>
                 </div>
+                {q.loadingChargesEnabled && (
+                  <div className="flex items-center gap-3 mt-1">
+                    <span className="text-sm font-semibold text-muted uppercase tracking-widest">Loading Charges</span>
+                    <span className="text-xl font-bold text-ink font-mono">
+                      {formatCurrency(Math.round(q.loadingChargesAmount || 0))}
+                    </span>
+                  </div>
+                )}
               </div>
             <div className="hidden sm:block w-px h-8 bg-gray-200"></div>
             <div className="flex items-center gap-3">

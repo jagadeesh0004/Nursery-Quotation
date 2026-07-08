@@ -57,6 +57,17 @@ public class Quotation extends BaseAuditEntity {
     @Builder.Default
     private boolean heightEnabled = false;
 
+    @Column(name = "loading_charges_enabled", nullable = false)
+    @Builder.Default
+    private boolean loadingChargesEnabled = false;
+
+    @Column(name = "loading_price_per_ton")
+    private BigDecimal loadingPricePerTon;
+
+    @Column(name = "loading_charges_amount", nullable = false)
+    @Builder.Default
+    private BigDecimal loadingChargesAmount = BigDecimal.ZERO;
+
     @Column(name = "total_amount", nullable = false)
     @Builder.Default
     private BigDecimal totalAmount = BigDecimal.ZERO;

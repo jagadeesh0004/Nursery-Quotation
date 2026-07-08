@@ -6,8 +6,15 @@ import com.nursery.common.response.PageResponse;
 import com.nursery.plant.service.PlantService;
 import com.nursery.profile.NurseryProfile;
 import com.nursery.profile.NurseryProfileRepository;
-import com.nursery.quotation.*;
-import com.nursery.quotation.dto.QuotationDtos.*;
+import com.nursery.quotation.Quotation;
+import com.nursery.quotation.QuotationItem;
+import com.nursery.quotation.QuotationRepository;
+import com.nursery.quotation.QuotationStatus;
+import com.nursery.quotation.dto.QuotationDtos.CreateQuotationRequest;
+import com.nursery.quotation.dto.QuotationDtos.QuotationItemRequest;
+import com.nursery.quotation.dto.QuotationDtos.QuotationResponse;
+import com.nursery.quotation.dto.QuotationDtos.QuotationSummaryResponse;
+import com.nursery.quotation.dto.QuotationDtos.UpdateQuotationRequest;
 import com.nursery.quotation.mapper.QuotationMapper;
 import com.nursery.quotation.numbering.QuotationNumberingService;
 import lombok.RequiredArgsConstructor;
@@ -19,11 +26,12 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.security.SecureRandom;
-import java.util.HexFormat;
 import java.time.OffsetDateTime;
 import java.time.Year;
 import java.util.ArrayList;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.UUID;
 
@@ -41,15 +49,12 @@ public class QuotationService {
 
     private final SecureRandom secureRandom = new SecureRandom();
 
-    // ─── Create ──────────────────────────────────────────────────────
-
     @Transactional
     public QuotationResponse createQuotation(UUID userId, CreateQuotationRequest request) {
         boolean finalize = Boolean.TRUE.equals(request.shouldFinalize());
 
         if (finalize) {
-            validateFinalQuotationRequest(request.customerName(), request.customerPhone(),
-                    request.customerAddress(), request.items());
+            validateFinalQuotationRequest(request.customerName(), request.customerPhone(), request.customerAddress(), request.items());
         }
 
         Quotation quotation = Quotation.builder()
@@ -60,9 +65,12 @@ public class QuotationService {
                 .customerAddress(request.customerAddress())
                 .notes(request.notes())
                 .heightEnabled(Boolean.TRUE.equals(request.heightEnabled()))
+                .loadingChargesEnabled(Boolean.TRUE.equals(request.loadingChargesEnabled()))
+                .loadingPricePerTon(request.loadingPricePerTon())
                 .year(Year.now().getValue())
                 .build();
 
+        validateLoadingCharges(finalize, quotation.isLoadingChargesEnabled(), quotation.getLoadingPricePerTon());
         applyItems(quotation, request.items(), userId);
         calculationEngine.recalculate(quotation);
 
@@ -78,8 +86,6 @@ public class QuotationService {
         return quotationMapper.toResponse(saved);
     }
 
-    // ─── Read ────────────────────────────────────────────────────────
-
     @Transactional(readOnly = true)
     public QuotationResponse getQuotation(UUID userId, Long quotationId) {
         Quotation quotation = findOwnedQuotation(userId, quotationId);
@@ -87,23 +93,19 @@ public class QuotationService {
     }
 
     @Transactional(readOnly = true)
-    public PageResponse<QuotationSummaryResponse> listQuotations(
-            UUID userId, String search, String status, int page, int size) {
-
+    public PageResponse<QuotationSummaryResponse> listQuotations(UUID userId, String search, String status, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         Page<Quotation> result;
 
         if (status != null && !status.isBlank()) {
-            QuotationStatus qs = parseStatus(status);
-            result = quotationRepository.findByUserIdAndStatusWithSearch(userId, qs, search, pageable);
+            QuotationStatus parsedStatus = parseStatus(status);
+            result = quotationRepository.findByUserIdAndStatusWithSearch(userId, parsedStatus, search, pageable);
         } else {
             result = quotationRepository.findByUserIdWithSearch(userId, search, pageable);
         }
 
         return PageResponse.from(result.map(quotationMapper::toSummaryResponse));
     }
-
-    // ─── Update ──────────────────────────────────────────────────────
 
     @Transactional
     public QuotationResponse updateQuotation(UUID userId, Long quotationId, UpdateQuotationRequest request) {
@@ -116,8 +118,7 @@ public class QuotationService {
         boolean finalize = Boolean.TRUE.equals(request.shouldFinalize());
 
         if (finalize) {
-            validateFinalQuotationRequest(request.customerName(), request.customerPhone(),
-                    request.customerAddress(), request.items());
+            validateFinalQuotationRequest(request.customerName(), request.customerPhone(), request.customerAddress(), request.items());
         }
 
         quotation.setCustomerName(request.customerName());
@@ -125,6 +126,10 @@ public class QuotationService {
         quotation.setCustomerAddress(request.customerAddress());
         quotation.setNotes(request.notes());
         quotation.setHeightEnabled(Boolean.TRUE.equals(request.heightEnabled()));
+        quotation.setLoadingChargesEnabled(Boolean.TRUE.equals(request.loadingChargesEnabled()));
+        quotation.setLoadingPricePerTon(request.loadingPricePerTon());
+
+        validateLoadingCharges(finalize, quotation.isLoadingChargesEnabled(), quotation.getLoadingPricePerTon());
 
         if (request.items() != null) {
             quotation.getItems().clear();
@@ -146,12 +151,6 @@ public class QuotationService {
         return quotationMapper.toResponse(saved);
     }
 
-    // ─── Draft Auto-Save ──────────────────────────────────────────────
-
-    /**
-     * Auto-save accepts partial data - no validation required for DRAFT state.
-     * Idempotent: calling multiple times is safe.
-     */
     @Transactional
     public QuotationResponse autoSaveDraft(UUID userId, Long quotationId, UpdateQuotationRequest request) {
         Quotation quotation = findOwnedQuotation(userId, quotationId);
@@ -160,24 +159,27 @@ public class QuotationService {
             throw new BusinessException("Cannot auto-save a finalized quotation.");
         }
 
-        if (request.customerName() != null)    quotation.setCustomerName(request.customerName());
-        if (request.customerPhone() != null)   quotation.setCustomerPhone(request.customerPhone());
+        if (request.customerName() != null) quotation.setCustomerName(request.customerName());
+        if (request.customerPhone() != null) quotation.setCustomerPhone(request.customerPhone());
         if (request.customerAddress() != null) quotation.setCustomerAddress(request.customerAddress());
-        if (request.notes() != null)           quotation.setNotes(request.notes());
-        if (request.heightEnabled() != null)   quotation.setHeightEnabled(request.heightEnabled());
+        if (request.notes() != null) quotation.setNotes(request.notes());
+        if (request.heightEnabled() != null) quotation.setHeightEnabled(request.heightEnabled());
+        if (request.loadingChargesEnabled() != null) quotation.setLoadingChargesEnabled(request.loadingChargesEnabled());
+        if (request.loadingPricePerTon() != null) quotation.setLoadingPricePerTon(request.loadingPricePerTon());
+
+        validateLoadingCharges(false, quotation.isLoadingChargesEnabled(), quotation.getLoadingPricePerTon());
 
         if (request.items() != null && !request.items().isEmpty()) {
             quotation.getItems().clear();
             applyItems(quotation, request.items(), userId);
-            calculationEngine.recalculate(quotation);
         }
+
+        calculationEngine.recalculate(quotation);
 
         Quotation saved = quotationRepository.save(quotation);
         log.debug("Draft auto-saved: quotationId={}", quotationId);
         return quotationMapper.toResponse(saved);
     }
-
-    // ─── Soft Delete ──────────────────────────────────────────────────
 
     @Transactional
     public void deleteQuotation(UUID userId, Long quotationId) {
@@ -187,12 +189,6 @@ public class QuotationService {
         log.info("Quotation [{}] soft-deleted for userId: {}", quotationId, userId);
     }
 
-    // ─── Duplication ──────────────────────────────────────────────────
-
-    /**
-     * Duplicates a quotation: copies customer details and items.
-     * Resets: id, quotationNumber, status (→ DRAFT), publicToken, timestamps.
-     */
     @Transactional
     public QuotationResponse duplicateQuotation(UUID userId, Long quotationId) {
         Quotation source = findOwnedQuotation(userId, quotationId);
@@ -205,8 +201,9 @@ public class QuotationService {
                 .customerAddress(source.getCustomerAddress())
                 .notes(source.getNotes())
                 .heightEnabled(source.isHeightEnabled())
+                .loadingChargesEnabled(source.isLoadingChargesEnabled())
+                .loadingPricePerTon(source.getLoadingPricePerTon())
                 .year(Year.now().getValue())
-                .totalAmount(source.getTotalAmount())
                 .build();
 
         List<QuotationItem> copiedItems = source.getItems().stream()
@@ -214,7 +211,7 @@ public class QuotationService {
                         .quotation(copy)
                         .plantName(item.getPlantName())
                         .dimension(item.getDimension())
-                    .height(item.getHeight())
+                        .height(item.getHeight())
                         .quantity(item.getQuantity())
                         .price(item.getPrice())
                         .itemTotal(item.getItemTotal())
@@ -229,29 +226,23 @@ public class QuotationService {
         return quotationMapper.toResponse(saved);
     }
 
-    // ─── Public Sharing ───────────────────────────────────────────────
-
     @Transactional(readOnly = true)
     public QuotationResponse getByPublicToken(String token) {
         Quotation quotation = quotationRepository.findByPublicToken(token)
                 .orElseThrow(() -> new ResourceNotFoundException("Quotation not found or link is invalid."));
 
-        if (quotation.getPublicTokenExpiresAt() != null &&
-                quotation.getPublicTokenExpiresAt().isBefore(OffsetDateTime.now())) {
+        if (quotation.getPublicTokenExpiresAt() != null && quotation.getPublicTokenExpiresAt().isBefore(OffsetDateTime.now())) {
             throw new BusinessException("This quotation link has expired.");
         }
 
         return buildResponseWithNurseryDetails(quotation);
     }
 
-    // ─── Helpers ──────────────────────────────────────────────────────
-
     private void applyItems(Quotation quotation, List<QuotationItemRequest> itemRequests, UUID userId) {
         if (itemRequests == null) return;
 
         List<QuotationItem> items = new ArrayList<>();
         for (QuotationItemRequest req : itemRequests) {
-            // Dynamic plant + dimension creation
             plantService.findOrCreatePlantWithDimension(userId, req.plantName(), req.dimension());
 
             String height = null;
@@ -288,22 +279,23 @@ public class QuotationService {
         }
     }
 
-    private void validateFinalQuotationRequest(
-            String customerName, String customerPhone,
-            String customerAddress, List<QuotationItemRequest> items) {
-
+    private void validateFinalQuotationRequest(String customerName, String customerPhone, String customerAddress, List<QuotationItemRequest> items) {
         List<String> errors = new ArrayList<>();
-        if (customerName == null || customerName.isBlank())
-            errors.add("Customer name is required for a final quotation.");
-        if (customerPhone == null || customerPhone.isBlank())
-            errors.add("Customer phone is required for a final quotation.");
-        if (customerAddress == null || customerAddress.isBlank())
-            errors.add("Customer address is required for a final quotation.");
-        if (items == null || items.isEmpty())
-            errors.add("At least one item is required for a final quotation.");
+        if (customerName == null || customerName.isBlank()) errors.add("Customer name is required for a final quotation.");
+        if (customerPhone == null || customerPhone.isBlank()) errors.add("Customer phone is required for a final quotation.");
+        if (customerAddress == null || customerAddress.isBlank()) errors.add("Customer address is required for a final quotation.");
+        if (items == null || items.isEmpty()) errors.add("At least one item is required for a final quotation.");
 
         if (!errors.isEmpty()) {
             throw new BusinessException(String.join(" ", errors));
+        }
+    }
+
+    private void validateLoadingCharges(boolean finalize, boolean loadingChargesEnabled, BigDecimal loadingPricePerTon) {
+        if (loadingChargesEnabled && loadingPricePerTon == null) {
+            throw new BusinessException(finalize
+                    ? "Loading price per ton is required when loading charges are enabled for a final quotation."
+                    : "Loading price per ton is required when loading charges are enabled.");
         }
     }
 
@@ -338,15 +330,10 @@ public class QuotationService {
         }
     }
 
-    /**
-     * Helper: Build QuotationResponse with nursery details from NurseryProfile
-     */
     private QuotationResponse buildResponseWithNurseryDetails(Quotation quotation) {
         NurseryProfile profile = profileRepository.findById(quotation.getUserId()).orElse(null);
-        
         QuotationResponse baseResponse = quotationMapper.toResponse(quotation);
-        
-        // Create a new response with nursery details
+
         return new QuotationResponse(
                 baseResponse.id(),
                 baseResponse.quotationNumber(),
@@ -355,12 +342,15 @@ public class QuotationService {
                 baseResponse.customerPhone(),
                 baseResponse.customerAddress(),
                 baseResponse.notes(),
-            baseResponse.heightEnabled(),
+                baseResponse.heightEnabled(),
                 profile != null ? profile.getNurseryName() : null,
                 profile != null ? profile.getAddress() : null,
                 profile != null ? profile.getPhone() : null,
                 profile != null ? profile.getOwnerName() : null,
                 baseResponse.items(),
+                baseResponse.loadingChargesEnabled(),
+                baseResponse.loadingPricePerTon(),
+                baseResponse.loadingChargesAmount(),
                 baseResponse.totalAmount(),
                 baseResponse.publicToken(),
                 baseResponse.finalizedAt(),
