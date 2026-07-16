@@ -45,6 +45,7 @@ public class Invoice {
     private BigDecimal discountAmount;
     private BigDecimal shippingCharges;
     private BigDecimal grandTotal;
+    private boolean showAdvanceListInPdf;
 
     @OneToMany(mappedBy = "invoice", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default

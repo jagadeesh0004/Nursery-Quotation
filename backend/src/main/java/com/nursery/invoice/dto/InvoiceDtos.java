@@ -22,6 +22,7 @@ public class InvoiceDtos {
         BigDecimal shippingCharges;
         DiscountRequest discount;
         List<InvoiceItemRequest> items;
+        Boolean showAdvanceListInPdf;
         Boolean shouldFinalize;
     }
 
@@ -35,6 +36,7 @@ public class InvoiceDtos {
         BigDecimal shippingCharges;
         DiscountRequest discount;
         List<InvoiceItemRequest> items;
+        Boolean showAdvanceListInPdf;
         Boolean shouldFinalize;
     }
 
@@ -84,6 +86,7 @@ public class InvoiceDtos {
         BigDecimal discountAmount;
         BigDecimal shippingCharges;
         BigDecimal grandTotal;
+        Boolean showAdvanceListInPdf;
         List<AdvancePaymentResponse> advancePayments;
         BigDecimal totalAdvance;
         BigDecimal remainingAmount;

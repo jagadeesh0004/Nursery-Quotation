@@ -181,7 +181,7 @@ export default function PublicQuotationPage() {
                 </div>
                 {(q.shippingCharges || 0) > 0 && (
                   <div className="flex items-center gap-3 mt-1">
-                    <span className="text-sm font-semibold text-muted uppercase tracking-widest">Shipping</span>
+                    <span className="text-sm font-semibold text-muted uppercase tracking-widest">Loading Charges</span>
                     <span className="text-lg font-bold text-ink font-mono">{formatCurrency(q.shippingCharges)}</span>
                   </div>
                 )}

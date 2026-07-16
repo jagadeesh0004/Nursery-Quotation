@@ -117,7 +117,7 @@ export default function QuotationFormPage() {
     if (shouldFinalize && !customerAddress.trim()) errs.customerAddress = 'Address is required to finalize'
     if (discountType === 'PERCENTAGE' && rawDiscountValue > 100) errs.discountValue = 'Discount percentage cannot exceed 100'
     if (discountAmount > grandTotal) errs.discountValue = 'Discount cannot exceed the plant total'
-    if (shippingValue < 0) errs.shippingCharges = 'Shipping charges cannot be negative'
+    if (shippingValue < 0) errs.shippingCharges = 'Loading charges cannot be negative'
     const validItems = items.filter(it => it.plantName)
     if (validItems.length === 0) errs.items = 'Add at least one plant item to save the quotation'
     items.forEach((it, i) => {
@@ -619,7 +619,7 @@ export default function QuotationFormPage() {
       <SectionCard title="Amount Summary" icon="💰" className="mb-4">
         <div className="grid grid-cols-1 gap-4 mb-4">
           <Input
-            label="Shipping Charges"
+            label="Loading Charges"
             type="number"
             min="0"
             step="0.01"

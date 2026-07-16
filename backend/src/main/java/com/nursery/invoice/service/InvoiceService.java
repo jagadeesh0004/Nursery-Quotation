@@ -63,6 +63,7 @@ public class InvoiceService {
                 .notes(request.getNotes())
                 .heightEnabled(Boolean.TRUE.equals(request.getHeightEnabled()))
                 .shippingCharges(zeroIfNull(request.getShippingCharges()))
+                .showAdvanceListInPdf(Boolean.TRUE.equals(request.getShowAdvanceListInPdf()))
                 .year(Year.now().getValue())
                 .invoiceDate(OffsetDateTime.now())
                 .build();
@@ -122,6 +123,7 @@ public class InvoiceService {
         invoice.setNotes(request.getNotes());
         invoice.setHeightEnabled(Boolean.TRUE.equals(request.getHeightEnabled()));
         invoice.setShippingCharges(zeroIfNull(request.getShippingCharges()));
+        invoice.setShowAdvanceListInPdf(Boolean.TRUE.equals(request.getShowAdvanceListInPdf()));
         if (invoice.getInvoiceDate() == null) {
             invoice.setInvoiceDate(OffsetDateTime.now());
         }
@@ -163,6 +165,7 @@ public class InvoiceService {
                 .discountAmount(zeroIfNull(source.getDiscountAmount()))
                 .shippingCharges(zeroIfNull(source.getShippingCharges()))
                 .grandTotal(zeroIfNull(source.getGrandTotal()))
+                .showAdvanceListInPdf(false)
                 .year(Year.now().getValue())
                 .totalAmount(source.getTotalAmount())
                 .invoiceDate(OffsetDateTime.now())
@@ -347,6 +350,7 @@ public class InvoiceService {
                 baseResponse.getDiscountAmount(),
                 baseResponse.getShippingCharges(),
                 baseResponse.getGrandTotal(),
+                invoice.isShowAdvanceListInPdf(),
                 advances,
                 totalAdvance,
                 remainingAmount,

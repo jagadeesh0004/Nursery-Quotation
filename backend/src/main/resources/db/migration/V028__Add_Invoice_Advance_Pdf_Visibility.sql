@@ -1,0 +1,2 @@
+ALTER TABLE invoices
+  ADD COLUMN IF NOT EXISTS show_advance_list_in_pdf BOOLEAN NOT NULL DEFAULT FALSE;

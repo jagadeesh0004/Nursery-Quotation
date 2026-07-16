@@ -30,6 +30,7 @@ export default function InvoiceFormPage() {
   const [activeDimSearch, setActiveDimSearch] = useState(null)
   const [quickAddLoading, setQuickAddLoading] = useState({})
   const [advancePayments, setAdvancePayments] = useState([])
+  const [showAdvanceListInPdf, setShowAdvanceListInPdf] = useState(false)
   const [advanceModalOpen, setAdvanceModalOpen] = useState(false)
   const [advanceSaving, setAdvanceSaving] = useState(false)
   const [deletingAdvanceId, setDeletingAdvanceId] = useState(null)
@@ -56,6 +57,7 @@ export default function InvoiceFormPage() {
       setNotes(invoice.notes || '')
       setHeightEnabled(Boolean(invoice.heightEnabled))
       setShippingCharges(invoice.shippingCharges ?? '')
+      setShowAdvanceListInPdf(Boolean(invoice.showAdvanceListInPdf))
       setDiscountType(invoice.discountType || 'AMOUNT')
       setDiscountValue(invoice.discountType === 'PERCENTAGE'
         ? (invoice.discountPercentage ?? '')
@@ -120,7 +122,7 @@ export default function InvoiceFormPage() {
     if (shouldFinalize && !customerAddress.trim()) errs.customerAddress = 'Address is required to finalize'
     if (discountType === 'PERCENTAGE' && rawDiscountValue > 100) errs.discountValue = 'Discount percentage cannot exceed 100'
     if (discountAmount > grandTotal) errs.discountValue = 'Discount cannot exceed the plant total'
-    if (shippingValue < 0) errs.shippingCharges = 'Shipping charges cannot be negative'
+    if (shippingValue < 0) errs.shippingCharges = 'Loading charges cannot be negative'
     const validItems = items.filter(it => it.plantName)
     if (validItems.length === 0) errs.items = 'Add at least one plant item to save the invoice'
     items.forEach((it, i) => {
@@ -157,6 +159,7 @@ export default function InvoiceFormPage() {
         notes: notes.trim() || undefined,
         heightEnabled,
         shippingCharges: shippingValue,
+        showAdvanceListInPdf,
         discount: discountValue === ''
           ? undefined
           : {
@@ -665,7 +668,7 @@ export default function InvoiceFormPage() {
       <SectionCard title="Amount Summary" icon="💰" className="mb-4">
         <div className="grid grid-cols-1 gap-4 mb-4">
           <Input
-            label="Shipping Charges"
+            label="Loading Charges"
             type="number"
             min="0"
             step="0.01"
@@ -721,6 +724,19 @@ export default function InvoiceFormPage() {
               <Plus className="w-3.5 h-3.5" /> Add Advance
             </Button>
           </div>
+
+          <label className="mb-4 flex items-start gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={showAdvanceListInPdf}
+              onChange={e => setShowAdvanceListInPdf(e.target.checked)}
+              className="mt-1 h-4 w-4 rounded border-gray-300 text-[#5CB338] focus:ring-[#5CB338]"
+            />
+            <div>
+              <p className="text-sm font-semibold text-ink">Show advance list in invoice PDF</p>
+              <p className="text-xs text-muted">If this is off, the PDF shows only Total Advance. If it is on, the PDF also shows the advance table.</p>
+            </div>
+          </label>
 
           {advancePayments.length === 0 ? (
             <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 px-4 py-6 text-sm text-muted">
