@@ -179,11 +179,23 @@ export default function PublicQuotationPage() {
                   <span className="text-sm font-semibold text-muted uppercase tracking-widest">Net Weight</span>
                   <span className="text-xl font-bold text-ink font-mono">{formatWeight(totalNetWeight)}</span>
                 </div>
+                {(q.shippingCharges || 0) > 0 && (
+                  <div className="flex items-center gap-3 mt-1">
+                    <span className="text-sm font-semibold text-muted uppercase tracking-widest">Shipping</span>
+                    <span className="text-lg font-bold text-ink font-mono">{formatCurrency(q.shippingCharges)}</span>
+                  </div>
+                )}
+                {(q.discountAmount || 0) > 0 && (
+                  <div className="flex items-center gap-3 mt-1">
+                    <span className="text-sm font-semibold text-muted uppercase tracking-widest">Discount</span>
+                    <span className="text-lg font-bold text-ink font-mono">{formatCurrency(q.discountAmount)}</span>
+                  </div>
+                )}
               </div>
             <div className="hidden sm:block w-px h-8 bg-gray-200"></div>
             <div className="flex items-center gap-3">
               <span className="text-sm font-semibold text-muted uppercase tracking-widest">Grand Total</span>
-              <span className="text-2xl sm:text-3xl font-bold text-[#5CB338] font-mono truncate">{formatCurrency(q.totalAmount)}</span>
+              <span className="text-2xl sm:text-3xl font-bold text-[#5CB338] font-mono truncate">{formatCurrency(q.grandTotal)}</span>
             </div>
           </div>
 

@@ -1,5 +1,6 @@
 package com.nursery.quotation.dto;
 
+import com.nursery.invoice.DiscountType;
 import com.nursery.quotation.QuotationStatus;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
@@ -45,6 +46,8 @@ public class QuotationDtos {
             String notes,
 
             Boolean heightEnabled,
+            BigDecimal shippingCharges,
+            DiscountRequest discount,
 
             @Valid
             List<QuotationItemRequest> items,
@@ -60,11 +63,18 @@ public class QuotationDtos {
             String notes,
 
             Boolean heightEnabled,
+            BigDecimal shippingCharges,
+            DiscountRequest discount,
 
             @Valid
             List<QuotationItemRequest> items,
 
             Boolean shouldFinalize
+    ) {}
+
+    public record DiscountRequest(
+            DiscountType type,
+            BigDecimal value
     ) {}
 
     // ─── Response DTOs ───────────────────────────────────────────────
@@ -94,6 +104,11 @@ public class QuotationDtos {
             String nurseryOwnerName,
             List<QuotationItemResponse> items,
             BigDecimal totalAmount,
+            DiscountType discountType,
+            BigDecimal discountPercentage,
+            BigDecimal discountAmount,
+            BigDecimal shippingCharges,
+            BigDecimal grandTotal,
             String publicToken,
             OffsetDateTime finalizedAt,
             OffsetDateTime createdAt,
@@ -105,7 +120,7 @@ public class QuotationDtos {
             String quotationNumber,
             QuotationStatus status,
             String customerName,
-            BigDecimal totalAmount,
+            BigDecimal grandTotal,
             OffsetDateTime createdAt
     ) {}
 }

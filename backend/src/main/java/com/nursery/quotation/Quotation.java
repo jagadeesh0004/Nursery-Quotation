@@ -1,6 +1,7 @@
 package com.nursery.quotation;
 
 import com.nursery.common.entity.BaseAuditEntity;
+import com.nursery.invoice.DiscountType;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.SQLRestriction;
@@ -60,6 +61,26 @@ public class Quotation extends BaseAuditEntity {
     @Column(name = "total_amount", nullable = false)
     @Builder.Default
     private BigDecimal totalAmount = BigDecimal.ZERO;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "discount_type", length = 32)
+    private DiscountType discountType;
+
+    @Column(name = "discount_percentage")
+    @Builder.Default
+    private BigDecimal discountPercentage = BigDecimal.ZERO;
+
+    @Column(name = "discount_amount", nullable = false)
+    @Builder.Default
+    private BigDecimal discountAmount = BigDecimal.ZERO;
+
+    @Column(name = "shipping_charges", nullable = false)
+    @Builder.Default
+    private BigDecimal shippingCharges = BigDecimal.ZERO;
+
+    @Column(name = "grand_total", nullable = false)
+    @Builder.Default
+    private BigDecimal grandTotal = BigDecimal.ZERO;
 
     @Version
     @Column(name = "version", nullable = false)

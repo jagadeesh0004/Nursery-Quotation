@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext'
 import { invoiceService } from '..//services'
 import { Button, Badge, Skeleton, ConfirmDialog, Card } from '../components/ui'
 import { formatCurrency, formatDate, downloadBlob, getError } from '../utils'
+import { getUnitWeightFromDimension, formatWeight } from '../constants/weightMapping'
 
 export default function InvoiceDetailPage() {
   const { id } = useParams()
@@ -16,6 +17,11 @@ export default function InvoiceDetailPage() {
   const [loading,     setLoading]     = useState(true)
   const [pdfLoading,  setPdfLoading]  = useState(false)
   const [showDelete,  setShowDelete]  = useState(false)
+
+  async function loadInvoice() {
+    const r = await invoiceService.getOne(id)
+    setInvoice(r.data.data)
+  }
 
   useEffect(() => {
     invoiceService.getOne(id)
@@ -66,6 +72,11 @@ export default function InvoiceDetailPage() {
   const formattedId = q.invoiceNumber || '-'
   const showHeight = Boolean(q.heightEnabled)
   const totalQuantity = (q.items || []).reduce((sum, it) => sum + (parseInt(it.quantity) || 0), 0)
+  const totalNetWeight = (q.items || []).reduce((sum, it) => {
+    const qty = parseInt(it.quantity) || 0
+    const unit = getUnitWeightFromDimension(it.dimension)
+    return sum + unit * qty
+  }, 0)
 
   return (
     <div className="animate-fade-up max-w-3xl">
@@ -147,20 +158,52 @@ export default function InvoiceDetailPage() {
         </div>
 
         <div className="flex flex-col sm:flex-row justify-end items-end sm:items-center gap-3 sm:gap-8 px-4 sm:px-6 py-4 sm:py-5 border-t border-gray-100 bg-gray-50/50">
-          <div className="flex items-center gap-3">
-            <span className="text-sm font-semibold text-muted uppercase tracking-widest">Total Qty</span>
-            <span className="text-xl font-bold text-ink font-mono">{totalQuantity}</span>
+          <div className="flex flex-col">
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-semibold text-muted uppercase tracking-widest">Total Qty</span>
+              <span className="text-xl font-bold text-ink font-mono">{totalQuantity}</span>
+            </div>
+            <div className="flex items-center gap-3 mt-1">
+              <span className="text-sm font-semibold text-muted uppercase tracking-widest">Net Weight</span>
+              <span className="text-xl font-bold text-ink font-mono">{formatWeight(totalNetWeight)}</span>
+            </div>
+            {(q.shippingCharges || 0) > 0 && (
+              <div className="flex items-center gap-3 mt-1">
+                <span className="text-sm font-semibold text-muted uppercase tracking-widest">Shipping</span>
+                <span className="text-lg font-bold text-ink font-mono">{formatCurrency(q.shippingCharges)}</span>
+              </div>
+            )}
+            {(q.discountAmount || 0) > 0 && (
+              <div className="flex items-center gap-3 mt-1">
+                <span className="text-sm font-semibold text-muted uppercase tracking-widest">Discount</span>
+                <span className="text-lg font-bold text-ink font-mono">{formatCurrency(q.discountAmount)}</span>
+              </div>
+            )}
           </div>
           <div className="hidden sm:block w-px h-8 bg-gray-200"></div>
-          <div className="flex items-center gap-3">
-            <span className="text-sm font-semibold text-muted uppercase tracking-widest">Grand Total</span>
-            <span className="text-2xl sm:text-3xl font-bold text-[#5CB338] font-mono truncate">{formatCurrency(q.totalAmount)}</span>
+          <div className="w-full sm:max-w-md space-y-2">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted">Total</span>
+              <span className="font-mono text-ink">{formatCurrency(q.totalAmount)}</span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="font-semibold text-muted uppercase tracking-widest">Grand Total</span>
+              <span className="text-2xl font-bold text-[#5CB338] font-mono truncate">{formatCurrency(q.grandTotal)}</span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted">Total Advance</span>
+              <span className="font-mono text-ink">{formatCurrency(q.totalAdvance || 0)}</span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="font-semibold text-muted uppercase tracking-widest">Remaining</span>
+              <span className="text-xl font-bold text-ink font-mono">{formatCurrency(q.remainingAmount || 0)}</span>
+            </div>
           </div>
         </div>
       </Card>
 
       <div className="flex flex-wrap items-center gap-2.5">
-        {!isFinal && <Button variant="secondary" className="flex-1 sm:flex-none justify-center" onClick={() => navigate(`/invoices/${id}/edit`)}><Edit2 className="w-3.5 h-3.5" />Edit</Button>}
+        <Button variant="secondary" className="flex-1 sm:flex-none justify-center" onClick={() => navigate(`/invoices/${id}/edit`)}><Edit2 className="w-3.5 h-3.5" />Edit</Button>
         <Button variant="ghost" className="w-full sm:w-auto justify-center text-red-500 hover:bg-red-100 hover:text-red-700 sm:ml-auto" onClick={() => setShowDelete(true)}>
           <Trash2 className="w-4 h-4" />Delete
         </Button>

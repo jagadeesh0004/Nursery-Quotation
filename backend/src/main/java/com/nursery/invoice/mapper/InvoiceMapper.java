@@ -16,6 +16,9 @@ public interface InvoiceMapper {
     @Mapping(target = "nurseryAddress", ignore = true)
     @Mapping(target = "nurseryPhone", ignore = true)
     @Mapping(target = "nurseryOwnerName", ignore = true)
+    @Mapping(target = "advancePayments", ignore = true)
+    @Mapping(target = "totalAdvance", ignore = true)
+    @Mapping(target = "remainingAmount", ignore = true)
     @Mapping(target = "items", source = "items")
     InvoiceResponse toResponse(Invoice invoice);
 

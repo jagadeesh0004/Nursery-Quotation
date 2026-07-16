@@ -10,7 +10,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Plus, Trash2, Calculator, Save, CheckCheck, AlertTriangle } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { quotationService, plantService } from '../services'
-import { Button, Input, Textarea, Spinner, SectionCard } from '../components/ui'
+import { Button, Input, Textarea, Spinner, SectionCard, Select } from '../components/ui'
 import { formatCurrency, formatNumber, getError, cx } from '../utils'
 
 const newItem = () => ({ plantName: '', dimension: '', height: '', quantity: '', price: '' })
@@ -26,6 +26,9 @@ export default function QuotationFormPage() {
   const [customerAddress, setCustomerAddress] = useState('')
   const [notes,           setNotes]           = useState('')
   const [heightEnabled,   setHeightEnabled]   = useState(false)
+  const [shippingCharges, setShippingCharges] = useState('')
+  const [discountType,    setDiscountType]    = useState('AMOUNT')
+  const [discountValue,   setDiscountValue]   = useState('')
   const [items,           setItems]           = useState([newItem()])
   const [pageLoading,     setPageLoading]     = useState(isEdit)
   const [saving,          setSaving]          = useState(false)
@@ -53,6 +56,11 @@ export default function QuotationFormPage() {
       setCustomerAddress(q.customerAddress || '')
       setNotes(q.notes || '')
       setHeightEnabled(Boolean(q.heightEnabled))
+      setShippingCharges(q.shippingCharges ?? '')
+      setDiscountType(q.discountType || 'AMOUNT')
+      setDiscountValue(q.discountType === 'PERCENTAGE'
+        ? (q.discountPercentage ?? '')
+        : (q.discountAmount ?? ''))
       setItems(q.items?.length ? q.items.map(i => ({
         plantName: i.plantName || '', dimension: i.dimension || '', height: i.height || '',
         quantity: i.quantity ?? 0, price: i.price ?? '',
@@ -88,6 +96,12 @@ export default function QuotationFormPage() {
   const grandTotal = items.reduce(
     (sum, it) => sum + (parseFloat(it.price) || 0) * (parseInt(it.quantity) || 0), 0
   )
+  const shippingValue = parseFloat(shippingCharges) || 0
+  const rawDiscountValue = parseFloat(discountValue) || 0
+  const discountAmount = discountType === 'PERCENTAGE'
+    ? (grandTotal * rawDiscountValue) / 100
+    : rawDiscountValue
+  const finalGrandTotal = grandTotal + shippingValue - discountAmount
 
   const allUniqueDimensions = Array.from(new Set(plants.flatMap(p => p.dimensions?.map(d => d.dimension || d.label) || []))).filter(Boolean).sort()
 
@@ -101,6 +115,9 @@ export default function QuotationFormPage() {
     if (shouldFinalize && !customerName.trim()) errs.customerName = 'Customer name is required'
     if (shouldFinalize && !customerPhone.trim()) errs.customerPhone = 'Phone number is required to finalize'
     if (shouldFinalize && !customerAddress.trim()) errs.customerAddress = 'Address is required to finalize'
+    if (discountType === 'PERCENTAGE' && rawDiscountValue > 100) errs.discountValue = 'Discount percentage cannot exceed 100'
+    if (discountAmount > grandTotal) errs.discountValue = 'Discount cannot exceed the plant total'
+    if (shippingValue < 0) errs.shippingCharges = 'Shipping charges cannot be negative'
     const validItems = items.filter(it => it.plantName)
     if (validItems.length === 0) errs.items = 'Add at least one plant item to save the quotation'
     items.forEach((it, i) => {
@@ -136,6 +153,13 @@ export default function QuotationFormPage() {
         customerAddress: customerAddress.trim() || undefined,
         notes:           notes.trim()           || undefined,
         heightEnabled,
+        shippingCharges: shippingValue,
+        discount: discountValue === ''
+          ? undefined
+          : {
+              type: discountType,
+              value: rawDiscountValue,
+            },
         items: items.filter(it => it.plantName).map(it => ({
           plantName: it.plantName,
           dimension: it.dimension,
@@ -592,6 +616,53 @@ export default function QuotationFormPage() {
         </button>
       </SectionCard>
 
+      <SectionCard title="Amount Summary" icon="💰" className="mb-4">
+        <div className="grid grid-cols-1 gap-4 mb-4">
+          <Input
+            label="Shipping Charges"
+            type="number"
+            min="0"
+            step="0.01"
+            value={shippingCharges}
+            onChange={e => setShippingCharges(e.target.value)}
+            error={errors.shippingCharges}
+            placeholder="0.00"
+          />
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-[1fr,1.4fr] gap-4 items-start">
+          <Select label="Discount Type" value={discountType} onChange={e => setDiscountType(e.target.value)}>
+            <option value="AMOUNT">Amount</option>
+            <option value="PERCENTAGE">Percentage</option>
+          </Select>
+          <Input
+            label={discountType === 'PERCENTAGE' ? 'Discount Percentage' : 'Discount Amount'}
+            type="number"
+            min="0"
+            step="0.01"
+            value={discountValue}
+            onChange={e => setDiscountValue(e.target.value)}
+            error={errors.discountValue}
+            hint={discountType === 'PERCENTAGE'
+              ? `Calculated discount amount: ${formatCurrency(discountAmount)}`
+              : undefined}
+          />
+        </div>
+
+        <div className="mt-4 rounded-2xl border border-green-100 bg-green-50/60 px-4 py-4">
+          <div className="flex items-center justify-between text-sm text-muted mb-2">
+            <span>Discount Amount</span>
+            <span className="font-mono font-semibold text-ink">{formatCurrency(discountAmount)}</span>
+          </div>
+          <div className="flex items-center justify-between text-base font-semibold text-ink">
+            <span>Grand Total</span>
+            <span className={cx('font-mono text-xl', finalGrandTotal < 0 ? 'text-red-600' : 'text-[#5CB338]')}>
+              {formatCurrency(finalGrandTotal)}
+            </span>
+          </div>
+        </div>
+      </SectionCard>
+
       {/* Footer */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-3">
@@ -600,7 +671,7 @@ export default function QuotationFormPage() {
           </div>
           <div>
             <p className="text-[11px] font-semibold text-muted uppercase tracking-widest">Grand Total</p>
-            <p className="text-2xl font-bold text-[#5CB338] font-mono leading-none mt-0.5">{formatCurrency(grandTotal)}</p>
+            <p className="text-2xl font-bold text-[#5CB338] font-mono leading-none mt-0.5">{formatCurrency(finalGrandTotal)}</p>
           </div>
         </div>
         <div className="flex gap-2.5 w-full sm:w-auto">

@@ -3,6 +3,7 @@ package com.nursery.quotation.service;
 import com.nursery.common.exception.BusinessException;
 import com.nursery.common.exception.ResourceNotFoundException;
 import com.nursery.common.response.PageResponse;
+import com.nursery.invoice.DiscountType;
 import com.nursery.plant.service.PlantService;
 import com.nursery.profile.NurseryProfile;
 import com.nursery.profile.NurseryProfileRepository;
@@ -21,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
 import java.util.HexFormat;
+import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.time.Year;
 import java.util.ArrayList;
@@ -60,10 +62,12 @@ public class QuotationService {
                 .customerAddress(request.customerAddress())
                 .notes(request.notes())
                 .heightEnabled(Boolean.TRUE.equals(request.heightEnabled()))
+                .shippingCharges(zeroIfNull(request.shippingCharges()))
                 .year(Year.now().getValue())
                 .build();
 
         applyItems(quotation, request.items(), userId);
+        applyDiscount(quotation, request.discount());
         calculationEngine.recalculate(quotation);
 
         if (finalize) {
@@ -109,10 +113,6 @@ public class QuotationService {
     public QuotationResponse updateQuotation(UUID userId, Long quotationId, UpdateQuotationRequest request) {
         Quotation quotation = findOwnedQuotation(userId, quotationId);
 
-        if (quotation.getStatus() == QuotationStatus.FINAL) {
-            throw new BusinessException("Finalized quotations cannot be edited.");
-        }
-
         boolean finalize = Boolean.TRUE.equals(request.shouldFinalize());
 
         if (finalize) {
@@ -125,12 +125,14 @@ public class QuotationService {
         quotation.setCustomerAddress(request.customerAddress());
         quotation.setNotes(request.notes());
         quotation.setHeightEnabled(Boolean.TRUE.equals(request.heightEnabled()));
+        quotation.setShippingCharges(zeroIfNull(request.shippingCharges()));
 
         if (request.items() != null) {
             quotation.getItems().clear();
             applyItems(quotation, request.items(), userId);
         }
 
+        applyDiscount(quotation, request.discount());
         calculationEngine.recalculate(quotation);
 
         if (finalize) {
@@ -165,12 +167,15 @@ public class QuotationService {
         if (request.customerAddress() != null) quotation.setCustomerAddress(request.customerAddress());
         if (request.notes() != null)           quotation.setNotes(request.notes());
         if (request.heightEnabled() != null)   quotation.setHeightEnabled(request.heightEnabled());
+        if (request.shippingCharges() != null) quotation.setShippingCharges(zeroIfNull(request.shippingCharges()));
+        if (request.discount() != null)        applyDiscount(quotation, request.discount());
 
         if (request.items() != null && !request.items().isEmpty()) {
             quotation.getItems().clear();
             applyItems(quotation, request.items(), userId);
-            calculationEngine.recalculate(quotation);
         }
+
+        calculationEngine.recalculate(quotation);
 
         Quotation saved = quotationRepository.save(quotation);
         log.debug("Draft auto-saved: quotationId={}", quotationId);
@@ -205,6 +210,11 @@ public class QuotationService {
                 .customerAddress(source.getCustomerAddress())
                 .notes(source.getNotes())
                 .heightEnabled(source.isHeightEnabled())
+                .discountType(source.getDiscountType())
+                .discountPercentage(source.getDiscountPercentage())
+                .discountAmount(source.getDiscountAmount())
+                .shippingCharges(source.getShippingCharges())
+                .grandTotal(source.getGrandTotal())
                 .year(Year.now().getValue())
                 .totalAmount(source.getTotalAmount())
                 .build();
@@ -307,6 +317,29 @@ public class QuotationService {
         }
     }
 
+    private void applyDiscount(Quotation quotation, DiscountRequest discount) {
+        if (discount == null || discount.type() == null || discount.value() == null) {
+            quotation.setDiscountType(null);
+            quotation.setDiscountPercentage(BigDecimal.ZERO);
+            quotation.setDiscountAmount(BigDecimal.ZERO);
+            return;
+        }
+        if (discount.value().signum() < 0) {
+            throw new BusinessException("Discount cannot be negative.");
+        }
+        quotation.setDiscountType(discount.type());
+        if (discount.type() == DiscountType.PERCENTAGE) {
+            if (discount.value().compareTo(BigDecimal.valueOf(100)) > 0) {
+                throw new BusinessException("Discount percentage must be between 0 and 100.");
+            }
+            quotation.setDiscountPercentage(discount.value());
+            quotation.setDiscountAmount(BigDecimal.ZERO);
+        } else {
+            quotation.setDiscountPercentage(BigDecimal.ZERO);
+            quotation.setDiscountAmount(discount.value());
+        }
+    }
+
     private boolean isValidHeightFormat(String height) {
         if (height == null) return false;
         String trimmed = height.trim();
@@ -362,10 +395,19 @@ public class QuotationService {
                 profile != null ? profile.getOwnerName() : null,
                 baseResponse.items(),
                 baseResponse.totalAmount(),
+                baseResponse.discountType(),
+                baseResponse.discountPercentage(),
+                baseResponse.discountAmount(),
+                baseResponse.shippingCharges(),
+                baseResponse.grandTotal(),
                 baseResponse.publicToken(),
                 baseResponse.finalizedAt(),
                 baseResponse.createdAt(),
                 baseResponse.updatedAt()
         );
+    }
+
+    private BigDecimal zeroIfNull(BigDecimal value) {
+        return value == null ? BigDecimal.ZERO : value;
     }
 }

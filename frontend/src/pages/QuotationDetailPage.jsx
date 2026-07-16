@@ -208,18 +208,36 @@ export default function QuotationDetailPage() {
               <span className="text-sm font-semibold text-muted uppercase tracking-widest">Net Weight</span>
               <span className="text-xl font-bold text-ink font-mono">{formatWeight(totalNetWeight)}</span>
             </div>
+            {(q.shippingCharges || 0) > 0 && (
+              <div className="flex items-center gap-3 mt-1">
+                <span className="text-sm font-semibold text-muted uppercase tracking-widest">Shipping</span>
+                <span className="text-lg font-bold text-ink font-mono">{formatCurrency(q.shippingCharges)}</span>
+              </div>
+            )}
+            {(q.discountAmount || 0) > 0 && (
+              <div className="flex items-center gap-3 mt-1">
+                <span className="text-sm font-semibold text-muted uppercase tracking-widest">Discount</span>
+                <span className="text-lg font-bold text-ink font-mono">{formatCurrency(q.discountAmount)}</span>
+              </div>
+            )}
           </div>
           <div className="hidden sm:block w-px h-8 bg-gray-200"></div>
-          <div className="flex items-center gap-3">
-            <span className="text-sm font-semibold text-muted uppercase tracking-widest">Grand Total</span>
-            <span className="text-2xl sm:text-3xl font-bold text-[#5CB338] font-mono truncate">{formatCurrency(q.totalAmount)}</span>
+          <div className="w-full sm:max-w-md space-y-2">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted">Total</span>
+              <span className="font-mono text-ink">{formatCurrency(q.totalAmount)}</span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-sm font-semibold text-muted uppercase tracking-widest">Grand Total</span>
+              <span className="text-2xl sm:text-3xl font-bold text-[#5CB338] font-mono truncate">{formatCurrency(q.grandTotal)}</span>
+            </div>
           </div>
         </div>
       </Card>
 
       {/* Actions */}
       <div className="flex flex-wrap items-center gap-2.5">
-        {!isFinal && <Button variant="secondary" className="flex-1 sm:flex-none justify-center" onClick={() => navigate(`/quotations/${id}/edit`)}><Edit2 className="w-3.5 h-3.5" />Edit</Button>}
+        <Button variant="secondary" className="flex-1 sm:flex-none justify-center" onClick={() => navigate(`/quotations/${id}/edit`)}><Edit2 className="w-3.5 h-3.5" />Edit</Button>
         <Button variant="secondary" className="flex-1 sm:flex-none justify-center" onClick={handleDuplicate} loading={dupeLoading}><Copy className="w-3.5 h-3.5" />Duplicate</Button>
         <Button variant="secondary" className="flex-1 sm:flex-none justify-center" onClick={handleCreateInvoice} loading={createLoading}><FilePlus className="w-3.5 h-3.5" />Create Invoice</Button>
         <Button variant="ghost" className="w-full sm:w-auto justify-center text-red-500 hover:bg-red-100 hover:text-red-700 sm:ml-auto" onClick={() => setShowDelete(true)}>

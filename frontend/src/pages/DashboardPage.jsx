@@ -135,7 +135,7 @@ export default function DashboardPage() {
                       <Badge variant={q.status === 'FINAL' ? 'green' : 'amber'}>{q.status}</Badge>
                     </td>
                     <td className="px-3 sm:px-5 py-3 sm:py-4 text-right">
-                      <span className="text-sm font-bold text-[#5CB338] font-mono">{formatCurrency(q.totalAmount)}</span>
+                      <span className="text-sm font-bold text-[#5CB338] font-mono">{formatCurrency(q.grandTotal)}</span>
                     </td>
                     <td className="px-3 sm:px-5 py-3 sm:py-4">
                       <div className="flex items-center justify-end gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity"

@@ -37,11 +37,22 @@ public class Invoice {
     private String notes;
     private boolean heightEnabled;
 
+    @Enumerated(EnumType.STRING)
+    private DiscountType discountType;
+
+    private BigDecimal discountPercentage;
     private BigDecimal totalAmount;
+    private BigDecimal discountAmount;
+    private BigDecimal shippingCharges;
+    private BigDecimal grandTotal;
 
     @OneToMany(mappedBy = "invoice", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<InvoiceItem> items = new ArrayList<>();
+
+    @OneToMany(mappedBy = "invoice", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<AdvancePayment> advancePayments = new ArrayList<>();
 
     @Column(name = "invoice_date", nullable = false)
     private OffsetDateTime invoiceDate;

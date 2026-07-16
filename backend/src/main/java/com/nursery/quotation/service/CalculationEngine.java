@@ -1,5 +1,7 @@
 package com.nursery.quotation.service;
 
+import com.nursery.common.exception.BusinessException;
+import com.nursery.invoice.DiscountType;
 import com.nursery.quotation.Quotation;
 import com.nursery.quotation.QuotationItem;
 import org.springframework.stereotype.Service;
@@ -31,14 +33,47 @@ public class CalculationEngine {
      * then recalculates and sets totalAmount on the quotation.
      */
     public void recalculate(Quotation quotation) {
-        BigDecimal grandTotal = BigDecimal.ZERO;
+        BigDecimal totalAmount = BigDecimal.ZERO;
 
         for (QuotationItem item : quotation.getItems()) {
             BigDecimal itemTotal = calculateItemTotal(item.getPrice(), item.getQuantity());
             item.setItemTotal(itemTotal);
-            grandTotal = grandTotal.add(itemTotal);
+            totalAmount = totalAmount.add(itemTotal);
         }
 
-        quotation.setTotalAmount(grandTotal.setScale(2, RoundingMode.HALF_UP));
+        totalAmount = totalAmount.setScale(2, RoundingMode.HALF_UP);
+        BigDecimal shippingCharges = zeroIfNull(quotation.getShippingCharges()).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal discountAmount = resolveDiscountAmount(quotation, totalAmount);
+        BigDecimal grandTotal = totalAmount.add(shippingCharges).subtract(discountAmount).setScale(2, RoundingMode.HALF_UP);
+
+        if (grandTotal.signum() < 0) {
+            throw new BusinessException("Grand total cannot be negative.");
+        }
+
+        quotation.setTotalAmount(totalAmount);
+        quotation.setDiscountAmount(discountAmount);
+        quotation.setShippingCharges(shippingCharges);
+        quotation.setGrandTotal(grandTotal);
+    }
+
+    private BigDecimal resolveDiscountAmount(Quotation quotation, BigDecimal totalAmount) {
+        if (quotation.getDiscountType() == null) {
+            return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        }
+
+        BigDecimal discountAmount = quotation.getDiscountType() == DiscountType.PERCENTAGE
+                ? totalAmount.multiply(zeroIfNull(quotation.getDiscountPercentage()))
+                    .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP)
+                : zeroIfNull(quotation.getDiscountAmount()).setScale(2, RoundingMode.HALF_UP);
+
+        if (discountAmount.compareTo(totalAmount) > 0) {
+            throw new BusinessException("Discount amount cannot exceed the total amount.");
+        }
+
+        return discountAmount;
+    }
+
+    private BigDecimal zeroIfNull(BigDecimal value) {
+        return value == null ? BigDecimal.ZERO : value;
     }
 }

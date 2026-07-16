@@ -129,6 +129,7 @@ export default function InvoiceListPage() {
               <tbody className="divide-y divide-gray-50">
                 {filteredInvoices.map(inv => {
                   const isFinal = inv.status === 'FINAL'
+                  const displayTotal = inv.grandTotal ?? inv.totalAmount ?? 0
                   return (
                     <tr
                       key={inv.id}
@@ -153,7 +154,7 @@ export default function InvoiceListPage() {
                         </Badge>
                       </td>
                       <td className="px-3 sm:px-5 py-3 sm:py-4 text-right">
-                        <span className="text-sm font-bold text-[#5CB338] font-mono">{formatCurrency(inv.totalAmount)}</span>
+                        <span className="text-sm font-bold text-[#5CB338] font-mono">{formatCurrency(displayTotal)}</span>
                       </td>
                       <td className="px-3 sm:px-5 py-3 sm:py-4">
                         <div
