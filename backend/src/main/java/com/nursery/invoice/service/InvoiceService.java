@@ -3,6 +3,7 @@ package com.nursery.invoice.service;
 import com.nursery.common.exception.BusinessException;
 import com.nursery.common.exception.ResourceNotFoundException;
 import com.nursery.common.response.PageResponse;
+import com.nursery.invoice.DiscountType;
 import com.nursery.invoice.Invoice;
 import com.nursery.invoice.InvoiceItem;
 import com.nursery.invoice.InvoiceRepository;
@@ -46,7 +47,7 @@ public class InvoiceService {
     private final CalculationEngine calculationEngine;
     private final PlantService plantService;
 
-    // ─── Create ──────────────────────────────────────────────────────
+    private final AdvancePaymentService advancePaymentService;
 
     @Transactional
     public InvoiceResponse createInvoice(UUID userId, CreateInvoiceRequest request) {
@@ -68,15 +69,16 @@ public class InvoiceService {
                 .customerAddress(request.getCustomerAddress())
                 .notes(request.getNotes())
                 .heightEnabled(Boolean.TRUE.equals(request.getHeightEnabled()))
-            .loadingChargesEnabled(Boolean.TRUE.equals(request.getLoadingChargesEnabled()))
-            .loadingPricePerTon(request.getLoadingPricePerTon())
+                .shippingCharges(zeroIfNull(request.getShippingCharges()))
+                .showAdvanceListInPdf(Boolean.TRUE.equals(request.getShowAdvanceListInPdf()))
                 .year(Year.now().getValue())
                 .invoiceDate(OffsetDateTime.now())
                 .build();
 
-        validateLoadingCharges(finalize, invoice.isLoadingChargesEnabled(), invoice.getLoadingPricePerTon());
         applyItems(invoice, request.getItems(), userId);
         calculationEngine.recalculate(invoice);
+        applyDiscount(invoice, request.getDiscount());
+        recalculate(invoice);
 
         if (finalize) {
             assignSequence(invoice, userId);
@@ -123,10 +125,6 @@ public class InvoiceService {
     public InvoiceResponse updateInvoice(UUID userId, Long invoiceId, UpdateInvoiceRequest request) {
         Invoice invoice = findOwnedInvoice(userId, invoiceId);
 
-        if (invoice.getStatus() == com.nursery.invoice.InvoiceStatus.FINAL) {
-            throw new BusinessException("Finalized invoices cannot be edited.");
-        }
-
         boolean finalize = Boolean.TRUE.equals(request.getShouldFinalize());
 
         if (finalize) {
@@ -144,11 +142,11 @@ public class InvoiceService {
         invoice.setHeightEnabled(Boolean.TRUE.equals(request.getHeightEnabled()));
         invoice.setLoadingChargesEnabled(Boolean.TRUE.equals(request.getLoadingChargesEnabled()));
         invoice.setLoadingPricePerTon(request.getLoadingPricePerTon());
+        invoice.setShippingCharges(zeroIfNull(request.getShippingCharges()));
+        invoice.setShowAdvanceListInPdf(Boolean.TRUE.equals(request.getShowAdvanceListInPdf()));
         if (invoice.getInvoiceDate() == null) {
             invoice.setInvoiceDate(OffsetDateTime.now());
         }
-
-        validateLoadingCharges(finalize, invoice.isLoadingChargesEnabled(), invoice.getLoadingPricePerTon());
 
         if (request.getItems() != null) {
             invoice.getItems().clear();
@@ -156,6 +154,8 @@ public class InvoiceService {
         }
 
         calculationEngine.recalculate(invoice);
+        applyDiscount(invoice, request.getDiscount());
+        recalculate(invoice);
 
         if (finalize) {
             invoice.setStatus(com.nursery.invoice.InvoiceStatus.FINAL);
@@ -181,8 +181,12 @@ public class InvoiceService {
                 .customerAddress(source.getCustomerAddress())
                 .notes(source.getNotes())
                 .heightEnabled(source.isHeightEnabled())
-            .loadingChargesEnabled(source.isLoadingChargesEnabled())
-            .loadingPricePerTon(source.getLoadingPricePerTon())
+                .discountType(source.getDiscountType())
+                .discountPercentage(source.getDiscountPercentage())
+                .discountAmount(zeroIfNull(source.getDiscountAmount()))
+                .shippingCharges(zeroIfNull(source.getShippingCharges()))
+                .grandTotal(zeroIfNull(source.getGrandTotal()))
+                .showAdvanceListInPdf(false)
                 .year(Year.now().getValue())
                 .invoiceDate(OffsetDateTime.now())
                 .build();
@@ -223,13 +227,16 @@ public class InvoiceService {
         if (request.getHeightEnabled() != null) invoice.setHeightEnabled(request.getHeightEnabled());
         if (request.getLoadingChargesEnabled() != null) invoice.setLoadingChargesEnabled(request.getLoadingChargesEnabled());
         if (request.getLoadingPricePerTon() != null) invoice.setLoadingPricePerTon(request.getLoadingPricePerTon());
+        if (request.getShippingCharges() != null) invoice.setShippingCharges(zeroIfNull(request.getShippingCharges()));
+        if (request.getShowAdvanceListInPdf() != null) invoice.setShowAdvanceListInPdf(request.getShowAdvanceListInPdf());
+        if (request.getDiscount() != null) applyDiscount(invoice, request.getDiscount());
 
         if (request.getItems() != null) {
             invoice.getItems().clear();
             applyItems(invoice, request.getItems(), userId);
         }
 
-        calculationEngine.recalculate(invoice);
+        recalculate(invoice);
 
         Invoice saved = invoiceRepository.save(invoice);
         log.debug("Draft auto-saved: invoiceId={}", invoiceId);
@@ -284,8 +291,69 @@ public class InvoiceService {
         invoice.getItems().addAll(items);
     }
 
-    private void recalculate(Invoice invoice) {
-        calculationEngine.recalculate(invoice);
+        private void recalculate(Invoice invoice) {
+        BigDecimal total = invoice.getItems().stream()
+                .map(it -> it.getItemTotal() == null ? BigDecimal.ZERO : it.getItemTotal())
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        invoice.setTotalAmount(total);
+        BigDecimal shipping = zeroIfNull(invoice.getShippingCharges());
+        BigDecimal discount = resolveDiscountAmount(invoice, total);
+        invoice.setDiscountAmount(discount);
+        invoice.setGrandTotal(total.add(shipping).subtract(discount));
+        if (invoice.getGrandTotal().signum() < 0) {
+            throw new BusinessException("Grand total cannot be negative.");
+        }
+    }
+
+    private void applyDiscount(Invoice invoice, DiscountRequest discount) {
+        if (discount == null || discount.getType() == null || discount.getValue() == null) {
+            invoice.setDiscountType(null);
+            invoice.setDiscountPercentage(null);
+            invoice.setDiscountAmount(BigDecimal.ZERO);
+            return;
+        }
+        if (discount.getValue().signum() < 0) {
+            throw new BusinessException("Discount cannot be negative.");
+        }
+        invoice.setDiscountType(discount.getType());
+        if (discount.getType() == DiscountType.PERCENTAGE) {
+            if (discount.getValue().compareTo(BigDecimal.valueOf(100)) > 0) {
+                throw new BusinessException("Discount percentage must be between 0 and 100.");
+            }
+            invoice.setDiscountPercentage(discount.getValue());
+        } else {
+            invoice.setDiscountPercentage(null);
+            invoice.setDiscountAmount(discount.getValue());
+        }
+    }
+
+    private BigDecimal resolveDiscountAmount(Invoice invoice, BigDecimal total) {
+        if (invoice.getDiscountType() == null) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal discountAmount = invoice.getDiscountType() == DiscountType.PERCENTAGE
+                ? zeroIfNull(total).multiply(zeroIfNull(invoice.getDiscountPercentage())).divide(BigDecimal.valueOf(100))
+                : zeroIfNull(invoice.getDiscountAmount());
+        if (discountAmount.compareTo(total) > 0) {
+            throw new BusinessException("Discount amount cannot exceed the total amount.");
+        }
+        return discountAmount;
+    }
+
+    private BigDecimal resolveSummaryGrandTotal(Invoice invoice) {
+        BigDecimal storedGrandTotal = zeroIfNull(invoice.getGrandTotal());
+        if (storedGrandTotal.signum() > 0) {
+            return storedGrandTotal;
+        }
+
+        BigDecimal itemsTotal = invoice.getItems().stream()
+                .map(item -> item.getItemTotal() == null ? BigDecimal.ZERO : item.getItemTotal())
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal shipping = zeroIfNull(invoice.getShippingCharges());
+        BigDecimal discount = resolveDiscountAmount(invoice, itemsTotal);
+        BigDecimal computedGrandTotal = itemsTotal.add(shipping).subtract(discount);
+
+        return computedGrandTotal.signum() < 0 ? BigDecimal.ZERO : computedGrandTotal;
     }
 
     private void assignSequence(Invoice invoice, UUID userId) {
@@ -336,6 +404,9 @@ public class InvoiceService {
         NurseryProfile profile = profileRepository.findByUserId(invoice.getUserId()).orElse(null);
         InvoiceResponse baseResponse = invoiceMapper.toResponse(invoice);
         String invoiceNumber = getInvoiceNumber(invoice, profile);
+        List<AdvancePaymentResponse> advances = advancePaymentService.getAllAdvances(invoice.getUserId(), invoice.getId());
+        BigDecimal totalAdvance = advancePaymentService.calculateTotalAdvance(invoice.getId());
+        BigDecimal remainingAmount = zeroIfNull(invoice.getGrandTotal()).subtract(totalAdvance);
 
         return new InvoiceResponse(
                 baseResponse.getId(),
@@ -355,17 +426,18 @@ public class InvoiceService {
                 baseResponse.getLoadingPricePerTon(),
                 baseResponse.getLoadingChargesAmount(),
                 baseResponse.getTotalAmount(),
+                baseResponse.getDiscountType(),
+                baseResponse.getDiscountPercentage(),
+                baseResponse.getDiscountAmount(),
+                baseResponse.getShippingCharges(),
+                baseResponse.getGrandTotal(),
+                invoice.isShowAdvanceListInPdf(),
+                advances,
+                totalAdvance,
+                remainingAmount,
                 invoice.getFinalizedAt(),
                 invoice.getCreatedAt()
         );
-    }
-
-    private void validateLoadingCharges(boolean finalize, boolean loadingChargesEnabled, BigDecimal loadingPricePerTon) {
-        if (loadingChargesEnabled && loadingPricePerTon == null) {
-            throw new BusinessException(finalize
-                    ? "Loading price per ton is required when loading charges are enabled for a final invoice."
-                    : "Loading price per ton is required when loading charges are enabled.");
-        }
     }
 
     private String getInvoiceNumber(Invoice invoice, NurseryProfile profile) {
@@ -405,5 +477,9 @@ public class InvoiceService {
 
     private String normalizeHeight(String height) {
         return height == null ? null : height.trim().replaceAll("\\s+", " ");
+    }
+
+    private BigDecimal zeroIfNull(BigDecimal value) {
+        return value == null ? BigDecimal.ZERO : value;
     }
 }

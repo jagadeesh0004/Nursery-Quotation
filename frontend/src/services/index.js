@@ -114,6 +114,14 @@ export const invoiceService = {
   importFromQuotation: (quotationId) => api.post(`/invoices/from-quotation/${quotationId}`),
 
   downloadPdf: (id) => api.get(`/invoices/${id}/pdf`, { responseType: 'blob', timeout: 30000 }),
+
+  getAdvances: (invoiceId) => api.get(`/api/invoices/${invoiceId}/advance`),
+
+  addAdvance: (invoiceId, data) => api.post(`/api/invoices/${invoiceId}/advance`, data),
+
+  updateAdvance: (advanceId, data) => api.put(`/api/advance/${advanceId}`, data),
+
+  deleteAdvance: (advanceId) => api.delete(`/api/advance/${advanceId}`),
 }
 
 /**

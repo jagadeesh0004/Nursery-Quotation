@@ -18,6 +18,11 @@ export default function InvoiceDetailPage() {
   const [pdfLoading,  setPdfLoading]  = useState(false)
   const [showDelete,  setShowDelete]  = useState(false)
 
+  async function loadInvoice() {
+    const r = await invoiceService.getOne(id)
+    setInvoice(r.data.data)
+  }
+
   useEffect(() => {
     invoiceService.getOne(id)
       .then(r  => setInvoice(r.data.data))
@@ -72,6 +77,18 @@ export default function InvoiceDetailPage() {
     const unit = getUnitWeightFromDimension(it.dimension)
     return sum + unit * qty
   }, 0)
+  const summaryRows = [
+    { label: 'Total Qty', value: totalQuantity },
+    { label: 'Net Weight', value: formatWeight(totalNetWeight) },
+    ...((q.shippingCharges || 0) > 0 ? [{ label: 'Loading Charges', value: formatCurrency(q.shippingCharges) }] : []),
+    ...((q.discountAmount || 0) > 0 ? [{ label: 'Discount', value: formatCurrency(q.discountAmount) }] : []),
+  ]
+  const amountRows = [
+    { label: 'Total', value: formatCurrency(q.totalAmount), tone: 'text-ink', emphasize: false },
+    { label: 'Grand Total', value: formatCurrency(q.grandTotal), tone: 'text-[#5CB338]', emphasize: true },
+    ...((q.totalAdvance || 0) > 0 ? [{ label: 'Total Advance', value: formatCurrency(q.totalAdvance || 0), tone: 'text-ink', emphasize: false }] : []),
+    ...((q.totalAdvance || 0) > 0 ? [{ label: 'Remaining', value: formatCurrency(q.remainingAmount || 0), tone: 'text-ink', emphasize: true }] : []),
+  ]
 
   return (
     <div className="animate-fade-up max-w-3xl">
@@ -152,35 +169,43 @@ export default function InvoiceDetailPage() {
           </table>
         </div>
 
-        <div className="flex flex-col sm:flex-row justify-end items-end sm:items-center gap-3 sm:gap-8 px-4 sm:px-6 py-4 sm:py-5 border-t border-gray-100 bg-gray-50/50">
-          <div className="flex flex-col">
-            <div className="flex items-center gap-3">
-              <span className="text-sm font-semibold text-muted uppercase tracking-widest">Total Qty</span>
-              <span className="text-xl font-bold text-ink font-mono">{totalQuantity}</span>
-            </div>
-            {q.loadingChargesEnabled && (
-              <div className="flex items-center gap-3 mt-1">
-                <span className="text-sm font-semibold text-muted uppercase tracking-widest">Loading Charges</span>
-                <span className="text-xl font-bold text-ink font-mono">
-                  {formatCurrency(Math.round(q.loadingChargesAmount || 0))}
-                </span>
-              </div>
-            )}
-            <div className="flex items-center gap-3 mt-1">
-              <span className="text-sm font-semibold text-muted uppercase tracking-widest">Net Weight</span>
-              <span className="text-xl font-bold text-ink font-mono">{formatWeight(totalNetWeight)}</span>
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(280px,360px)] gap-4 sm:gap-6 px-4 sm:px-6 py-4 sm:py-5 border-t border-gray-100 bg-gray-50/50 items-start">
+          <div className="rounded-2xl border border-gray-200 bg-white/80 px-4 py-4">
+            <div className="grid grid-cols-[minmax(120px,170px)_1fr] gap-x-4 gap-y-3 items-baseline">
+              {summaryRows.map(row => (
+                <div key={row.label} className="contents">
+                  <span className="text-[11px] sm:text-xs font-semibold text-muted uppercase tracking-[0.22em]">
+                    {row.label}
+                  </span>
+                  <span className="text-base sm:text-lg font-bold text-ink font-mono leading-none">
+                    {row.value}
+                  </span>
+                </div>
+              ))}
             </div>
           </div>
-          <div className="hidden sm:block w-px h-8 bg-gray-200"></div>
-          <div className="flex items-center gap-3">
-            <span className="text-sm font-semibold text-muted uppercase tracking-widest">Grand Total</span>
-            <span className="text-2xl sm:text-3xl font-bold text-[#5CB338] font-mono truncate">{formatCurrency(q.totalAmount)}</span>
+          <div className="rounded-2xl border border-green-100 bg-white px-4 sm:px-5 py-4">
+            <div className="space-y-3">
+              {amountRows.map((row, index) => (
+                <div
+                  key={row.label}
+                  className={`flex items-baseline justify-between gap-4 ${index > 0 ? 'border-t border-gray-100 pt-3' : ''}`}
+                >
+                  <span className={`uppercase tracking-[0.2em] ${row.emphasize ? 'text-xs sm:text-sm font-semibold text-muted' : 'text-[11px] sm:text-xs text-muted'}`}>
+                    {row.label}
+                  </span>
+                  <span className={`font-mono leading-none text-right ${row.emphasize ? `text-xl sm:text-2xl font-bold ${row.tone}` : `text-base sm:text-lg font-semibold ${row.tone}`}`}>
+                    {row.value}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </Card>
 
       <div className="flex flex-wrap items-center gap-2.5">
-        {!isFinal && <Button variant="secondary" className="flex-1 sm:flex-none justify-center" onClick={() => navigate(`/invoices/${id}/edit`)}><Edit2 className="w-3.5 h-3.5" />Edit</Button>}
+        <Button variant="secondary" className="flex-1 sm:flex-none justify-center" onClick={() => navigate(`/invoices/${id}/edit`)}><Edit2 className="w-3.5 h-3.5" />Edit</Button>
         <Button variant="ghost" className="w-full sm:w-auto justify-center text-red-500 hover:bg-red-100 hover:text-red-700 sm:ml-auto" onClick={() => setShowDelete(true)}>
           <Trash2 className="w-4 h-4" />Delete
         </Button>

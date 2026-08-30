@@ -51,11 +51,25 @@ public class Invoice {
     @Builder.Default
     private BigDecimal loadingChargesAmount = BigDecimal.ZERO;
 
+    @Enumerated(EnumType.STRING)
+    private DiscountType discountType;
+
+    @Builder.Default
+    private BigDecimal discountPercentage = BigDecimal.ZERO;
+
     private BigDecimal totalAmount;
+    private BigDecimal discountAmount;
+    private BigDecimal shippingCharges;
+    private BigDecimal grandTotal;
+    private boolean showAdvanceListInPdf;
 
     @OneToMany(mappedBy = "invoice", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<InvoiceItem> items = new ArrayList<>();
+
+    @OneToMany(mappedBy = "invoice", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<AdvancePayment> advancePayments = new ArrayList<>();
 
     @Column(name = "invoice_date", nullable = false)
     private OffsetDateTime invoiceDate;

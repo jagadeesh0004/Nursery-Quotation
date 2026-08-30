@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Plus, Trash2, Calculator, Save, CheckCheck, AlertTriangle } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, Calculator, Save, CheckCheck, AlertTriangle, Pencil } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { invoiceService, plantService } from '../services'
-import { Button, Input, Textarea, Spinner, SectionCard } from '../components/ui'
-import { formatCurrency, formatNumber, getError, cx } from '../utils'
-import { getUnitWeightFromDimension } from '../constants/weightMapping'
+import { Button, Input, Textarea, Spinner, SectionCard, Select, Modal } from '../components/ui'
+import { formatCurrency, formatNumber, formatDate, getError, cx } from '../utils'
 
 const newItem = () => ({ plantName: '', dimension: '', height: '', quantity: '', price: '' })
 
@@ -20,8 +19,9 @@ export default function InvoiceFormPage() {
   const [customerAddress, setCustomerAddress] = useState('')
   const [notes, setNotes] = useState('')
   const [heightEnabled, setHeightEnabled] = useState(false)
-  const [loadingChargesEnabled, setLoadingChargesEnabled] = useState(false)
-  const [loadingPricePerTon, setLoadingPricePerTon] = useState('')
+  const [shippingCharges, setShippingCharges] = useState('')
+  const [discountType, setDiscountType] = useState('AMOUNT')
+  const [discountValue, setDiscountValue] = useState('')
   const [items, setItems] = useState([newItem()])
   const [pageLoading, setPageLoading] = useState(isEdit)
   const [saving, setSaving] = useState(false)
@@ -29,6 +29,13 @@ export default function InvoiceFormPage() {
   const [activeSearch, setActiveSearch] = useState(null)
   const [activeDimSearch, setActiveDimSearch] = useState(null)
   const [quickAddLoading, setQuickAddLoading] = useState({})
+  const [advancePayments, setAdvancePayments] = useState([])
+  const [showAdvanceListInPdf, setShowAdvanceListInPdf] = useState(false)
+  const [advanceModalOpen, setAdvanceModalOpen] = useState(false)
+  const [advanceSaving, setAdvanceSaving] = useState(false)
+  const [deletingAdvanceId, setDeletingAdvanceId] = useState(null)
+  const [editingAdvance, setEditingAdvance] = useState(null)
+  const [advanceForm, setAdvanceForm] = useState({ paymentDate: '', amount: '', paymentMode: 'Cash', remarks: '' })
 
   useEffect(() => {
     plantService.list()
@@ -49,8 +56,13 @@ export default function InvoiceFormPage() {
       setCustomerAddress(invoice.customerAddress || '')
       setNotes(invoice.notes || '')
       setHeightEnabled(Boolean(invoice.heightEnabled))
-      setLoadingChargesEnabled(Boolean(invoice.loadingChargesEnabled))
-      setLoadingPricePerTon(invoice.loadingPricePerTon ?? '')
+      setShippingCharges(invoice.shippingCharges ?? '')
+      setShowAdvanceListInPdf(Boolean(invoice.showAdvanceListInPdf))
+      setDiscountType(invoice.discountType || 'AMOUNT')
+      setDiscountValue(invoice.discountType === 'PERCENTAGE'
+        ? (invoice.discountPercentage ?? '')
+        : (invoice.discountAmount ?? ''))
+      setAdvancePayments(invoice.advancePayments || [])
       setItems(invoice.items?.length ? invoice.items.map(i => ({
         plantName: i.plantName || '',
         dimension: i.dimension || '',
@@ -88,15 +100,14 @@ export default function InvoiceFormPage() {
   const grandTotal = items.reduce(
     (sum, it) => sum + (parseFloat(it.price) || 0) * (parseInt(it.quantity) || 0), 0
   )
-
-  const totalWeightKg = items.reduce(
-    (sum, it) => sum + (getUnitWeightFromDimension(it.dimension) * (parseInt(it.quantity) || 0)),
-    0
-  )
-  const loadingAmount = loadingChargesEnabled && loadingPricePerTon !== ''
-    ? (parseFloat(loadingPricePerTon) || 0) * (totalWeightKg / 1000)
-    : 0
-  const finalTotal = grandTotal + loadingAmount
+  const shippingValue = parseFloat(shippingCharges) || 0
+  const rawDiscountValue = parseFloat(discountValue) || 0
+  const discountAmount = discountType === 'PERCENTAGE'
+    ? (grandTotal * rawDiscountValue) / 100
+    : rawDiscountValue
+  const finalGrandTotal = grandTotal + shippingValue - discountAmount
+  const totalAdvance = advancePayments.reduce((sum, advance) => sum + (parseFloat(advance.amount) || 0), 0)
+  const remainingAmount = finalGrandTotal - totalAdvance
 
   const allUniqueDimensions = Array.from(new Set(plants.flatMap(p => p.dimensions?.map(d => d.dimension || d.label) || []))).filter(Boolean).sort()
 
@@ -109,9 +120,11 @@ export default function InvoiceFormPage() {
     if (shouldFinalize && !customerName.trim()) errs.customerName = 'Customer name is required'
     if (shouldFinalize && !customerPhone.trim()) errs.customerPhone = 'Phone number is required to finalize'
     if (shouldFinalize && !customerAddress.trim()) errs.customerAddress = 'Address is required to finalize'
+    if (discountType === 'PERCENTAGE' && rawDiscountValue > 100) errs.discountValue = 'Discount percentage cannot exceed 100'
+    if (discountAmount > grandTotal) errs.discountValue = 'Discount cannot exceed the plant total'
+    if (shippingValue < 0) errs.shippingCharges = 'Loading charges cannot be negative'
     const validItems = items.filter(it => it.plantName)
     if (validItems.length === 0) errs.items = 'Add at least one plant item to save the invoice'
-    if (loadingChargesEnabled && loadingPricePerTon === '') errs.loadingPricePerTon = 'Loading price per ton is required'
     items.forEach((it, i) => {
       if (it.plantName && (it.price === '' || it.price === null || it.price === undefined)) {
         if (!errs.itemRows) errs.itemRows = {}
@@ -145,8 +158,14 @@ export default function InvoiceFormPage() {
         customerAddress: customerAddress.trim() || undefined,
         notes: notes.trim() || undefined,
         heightEnabled,
-        loadingChargesEnabled,
-        loadingPricePerTon: loadingChargesEnabled ? (parseFloat(loadingPricePerTon) || 0) : undefined,
+        shippingCharges: shippingValue,
+        showAdvanceListInPdf,
+        discount: discountValue === ''
+          ? undefined
+          : {
+              type: discountType,
+              value: rawDiscountValue,
+            },
         items: items.filter(it => it.plantName).map(it => ({
           plantName: it.plantName,
           dimension: it.dimension,
@@ -226,14 +245,68 @@ export default function InvoiceFormPage() {
     })
   }
 
-  function toggleLoadingCharges() {
-    setLoadingChargesEnabled(prev => {
-      const next = !prev
-      if (!next) {
-        setLoadingPricePerTon('')
-      }
-      return next
+  function openAddAdvance() {
+    setEditingAdvance(null)
+    setAdvanceForm({ paymentDate: '', amount: '', paymentMode: 'Cash', remarks: '' })
+    setAdvanceModalOpen(true)
+  }
+
+  function openEditAdvance(advance) {
+    setEditingAdvance(advance)
+    setAdvanceForm({
+      paymentDate: advance.paymentDate || '',
+      amount: advance.amount ?? '',
+      paymentMode: advance.paymentMode || 'Cash',
+      remarks: advance.remarks || '',
     })
+    setAdvanceModalOpen(true)
+  }
+
+  async function refreshInvoiceAdvances() {
+    if (!isEdit) return
+    const response = await invoiceService.getOne(id)
+    setAdvancePayments(response.data.data?.advancePayments || [])
+  }
+
+  async function handleSaveAdvance() {
+    if (!advanceForm.paymentDate || !advanceForm.amount || !advanceForm.paymentMode) {
+      toast.error('Please fill the date, amount, and payment mode')
+      return
+    }
+    setAdvanceSaving(true)
+    try {
+      const payload = {
+        paymentDate: advanceForm.paymentDate,
+        amount: parseFloat(advanceForm.amount) || 0,
+        paymentMode: advanceForm.paymentMode,
+        remarks: advanceForm.remarks?.trim() || undefined,
+      }
+      if (editingAdvance?.id) await invoiceService.updateAdvance(editingAdvance.id, payload)
+      else await invoiceService.addAdvance(id, payload)
+      await refreshInvoiceAdvances()
+      toast.success(editingAdvance?.id ? 'Advance updated' : 'Advance added')
+      setAdvanceModalOpen(false)
+    } catch (err) {
+      const message = getError(err)
+      if (message) toast.error(message)
+    } finally {
+      setAdvanceSaving(false)
+    }
+  }
+
+  async function handleDeleteAdvance(advanceId) {
+    if (!window.confirm('Delete this advance payment?')) return
+    setDeletingAdvanceId(advanceId)
+    try {
+      await invoiceService.deleteAdvance(advanceId)
+      await refreshInvoiceAdvances()
+      toast.success('Advance deleted')
+    } catch (err) {
+      const message = getError(err)
+      if (message) toast.error(message)
+    } finally {
+      setDeletingAdvanceId(null)
+    }
   }
 
   if (pageLoading) return (
@@ -290,47 +363,6 @@ export default function InvoiceFormPage() {
             {heightEnabled ? 'Height enabled' : 'Height disabled'}
           </button>
         </div>
-
-        <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-xl border border-amber-100 bg-amber-50/70 px-4 py-3">
-          <div>
-            <p className="text-sm font-semibold text-ink">Loading charges</p>
-            <p className="text-xs text-muted">Optionally add a loading price per ton and include it in the total.</p>
-          </div>
-          <button
-            type="button"
-            onClick={toggleLoadingCharges}
-            className={cx(
-              'inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-colors border',
-              loadingChargesEnabled
-                ? 'bg-amber-600 text-white border-amber-600'
-                : 'bg-white text-muted border-gray-200 hover:border-amber-300 hover:text-amber-700'
-            )}
-          >
-            <span className={cx('w-2.5 h-2.5 rounded-full', loadingChargesEnabled ? 'bg-white' : 'bg-gray-300')} />
-            {loadingChargesEnabled ? 'Loading enabled' : 'Loading disabled'}
-          </button>
-        </div>
-
-        {loadingChargesEnabled && (
-          <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 gap-4 rounded-xl border border-amber-100 bg-amber-50/50 p-4">
-            <Input
-              label="Loading price per ton"
-              type="number"
-              min="0"
-              step="0.01"
-              placeholder="e.g. 2500"
-              value={loadingPricePerTon}
-              onChange={e => setLoadingPricePerTon(e.target.value)}
-              error={errors.loadingPricePerTon}
-            />
-            <div className="rounded-xl border border-amber-100 bg-white px-4 py-3">
-              <p className="text-[10px] font-semibold text-muted uppercase tracking-widest">Preview</p>
-              <p className="mt-1 text-sm text-ink">Weight: {formatNumber(totalWeightKg)} kg</p>
-              <p className="text-sm text-ink">Loading: {formatCurrency(loadingAmount)}</p>
-              <p className="text-sm text-ink">Final total: {formatCurrency(finalTotal)}</p>
-            </div>
-          </div>
-        )}
 
         {errors.items && (
           <div className="mb-3 flex items-center gap-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2">
@@ -633,6 +665,132 @@ export default function InvoiceFormPage() {
         </button>
       </SectionCard>
 
+      <SectionCard title="Amount Summary" icon="💰" className="mb-4">
+        <div className="grid grid-cols-1 gap-4 mb-4">
+          <Input
+            label="Loading Charges"
+            type="number"
+            min="0"
+            step="0.01"
+            value={shippingCharges}
+            onChange={e => setShippingCharges(e.target.value)}
+            error={errors.shippingCharges}
+            placeholder="0.00"
+          />
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-[1fr,1.4fr] gap-4 items-start">
+          <Select label="Discount Type" value={discountType} onChange={e => setDiscountType(e.target.value)}>
+            <option value="AMOUNT">Amount</option>
+            <option value="PERCENTAGE">Percentage</option>
+          </Select>
+          <Input
+            label={discountType === 'PERCENTAGE' ? 'Discount Percentage' : 'Discount Amount'}
+            type="number"
+            min="0"
+            step="0.01"
+            value={discountValue}
+            onChange={e => setDiscountValue(e.target.value)}
+            error={errors.discountValue}
+            placeholder={discountType === 'PERCENTAGE' ? '0.00' : '0.00'}
+            hint={discountType === 'PERCENTAGE'
+              ? `Calculated discount amount: ${formatCurrency(discountAmount)}`
+              : undefined}
+          />
+        </div>
+
+        <div className="mt-4 rounded-2xl border border-green-100 bg-green-50/60 px-4 py-4">
+          <div className="flex items-center justify-between text-sm text-muted mb-2">
+            <span>Discount Amount</span>
+            <span className="font-mono font-semibold text-ink">{formatCurrency(discountAmount)}</span>
+          </div>
+          <div className="flex items-center justify-between text-base font-semibold text-ink">
+            <span>Grand Total</span>
+            <span className={cx('font-mono text-xl', finalGrandTotal < 0 ? 'text-red-600' : 'text-[#5CB338]')}>
+              {formatCurrency(finalGrandTotal)}
+            </span>
+          </div>
+        </div>
+      </SectionCard>
+
+      {isEdit && (
+        <SectionCard title="Advance Payments" icon="💵" className="mb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4 rounded-xl border border-green-100 bg-green-50/60 px-4 py-3">
+            <div>
+              <p className="text-sm font-semibold text-ink">Manage customer advances</p>
+              <p className="text-xs text-muted">Record partial payments directly while editing the invoice.</p>
+            </div>
+            <Button size="sm" onClick={openAddAdvance}>
+              <Plus className="w-3.5 h-3.5" /> Add Advance
+            </Button>
+          </div>
+
+          <label className="mb-4 flex items-start gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={showAdvanceListInPdf}
+              onChange={e => setShowAdvanceListInPdf(e.target.checked)}
+              className="mt-1 h-4 w-4 rounded border-gray-300 text-[#5CB338] focus:ring-[#5CB338]"
+            />
+            <div>
+              <p className="text-sm font-semibold text-ink">Show advance list in invoice PDF</p>
+              <p className="text-xs text-muted">If this is off, the PDF shows only Total Advance. If it is on, the PDF also shows the advance table.</p>
+            </div>
+          </label>
+
+          {advancePayments.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 px-4 py-6 text-sm text-muted">
+              No advance payments added yet.
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-xl border border-gray-100">
+              <table className="w-full min-w-[520px]">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-[11px] font-semibold text-muted uppercase tracking-widest">Date</th>
+                    <th className="px-4 py-3 text-left text-[11px] font-semibold text-muted uppercase tracking-widest">Mode</th>
+                    <th className="px-4 py-3 text-left text-[11px] font-semibold text-muted uppercase tracking-widest">Remarks</th>
+                    <th className="px-4 py-3 text-right text-[11px] font-semibold text-muted uppercase tracking-widest">Amount</th>
+                    <th className="px-4 py-3 text-right text-[11px] font-semibold text-muted uppercase tracking-widest">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {advancePayments.map(advance => (
+                    <tr key={advance.id} className="border-t border-gray-100 bg-white">
+                      <td className="px-4 py-3 text-sm text-ink">{formatDate(advance.paymentDate)}</td>
+                      <td className="px-4 py-3 text-sm text-muted">{advance.paymentMode}</td>
+                      <td className="px-4 py-3 text-sm text-muted">{advance.remarks || '-'}</td>
+                      <td className="px-4 py-3 text-sm text-right font-semibold text-ink font-mono">{formatCurrency(advance.amount)}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-end gap-2">
+                          <Button size="sm" variant="secondary" onClick={() => openEditAdvance(advance)}>
+                            <Pencil className="w-3.5 h-3.5" /> Edit
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-red-500 hover:bg-red-100 hover:text-red-700"
+                            onClick={() => handleDeleteAdvance(advance.id)}
+                            loading={deletingAdvanceId === advance.id}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" /> Delete
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+            <Input label="Total Advance" value={formatCurrency(totalAdvance)} readOnly className="bg-gray-50" />
+            <Input label="Remaining Amount" value={formatCurrency(remainingAmount)} readOnly className="bg-gray-50" />
+          </div>
+        </SectionCard>
+      )}
+
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-11 h-11 rounded-xl bg-green-100 flex items-center justify-center">
@@ -640,7 +798,7 @@ export default function InvoiceFormPage() {
           </div>
           <div>
             <p className="text-[11px] font-semibold text-muted uppercase tracking-widest">Grand Total</p>
-            <p className="text-2xl font-bold text-[#5CB338] font-mono leading-none mt-0.5">{formatCurrency(finalTotal)}</p>
+            <p className="text-2xl font-bold text-[#5CB338] font-mono leading-none mt-0.5">{formatCurrency(finalGrandTotal)}</p>
           </div>
         </div>
         <div className="flex gap-2.5 w-full sm:w-auto">
@@ -652,6 +810,51 @@ export default function InvoiceFormPage() {
           </Button>
         </div>
       </div>
+
+      <Modal
+        open={advanceModalOpen}
+        onClose={() => setAdvanceModalOpen(false)}
+        title={editingAdvance?.id ? 'Edit Advance Payment' : 'Add Advance Payment'}
+        footer={
+          <div className="flex justify-end gap-2.5">
+            <Button variant="secondary" onClick={() => setAdvanceModalOpen(false)}>Cancel</Button>
+            <Button onClick={handleSaveAdvance} loading={advanceSaving}>Save</Button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <Input
+            label="Payment Date"
+            type="date"
+            value={advanceForm.paymentDate}
+            onChange={e => setAdvanceForm(prev => ({ ...prev, paymentDate: e.target.value }))}
+          />
+          <Input
+            label="Amount"
+            type="number"
+            min="0"
+            step="0.01"
+            value={advanceForm.amount}
+            onChange={e => setAdvanceForm(prev => ({ ...prev, amount: e.target.value }))}
+          />
+          <Select
+            label="Payment Mode"
+            value={advanceForm.paymentMode}
+            onChange={e => setAdvanceForm(prev => ({ ...prev, paymentMode: e.target.value }))}
+          >
+            <option value="Cash">Cash</option>
+            <option value="UPI">UPI</option>
+            <option value="Bank Transfer">Bank Transfer</option>
+            <option value="Cheque">Cheque</option>
+          </Select>
+          <Textarea
+            label="Remarks"
+            rows={3}
+            value={advanceForm.remarks}
+            onChange={e => setAdvanceForm(prev => ({ ...prev, remarks: e.target.value }))}
+          />
+        </div>
+      </Modal>
     </div>
   )
 }

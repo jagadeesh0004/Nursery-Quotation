@@ -14,7 +14,6 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import lombok.extern.slf4j.Slf4j;
-import jakarta.servlet.http.HttpServletRequest;
 import java.util.Arrays;
 import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
@@ -29,6 +28,9 @@ public class SecurityConfig {
 
     @Value("${supabase.issuer}")
     private String issuer;
+
+    @Value("${spring.security.oauth2.resourceserver.jwt.issuer-uri:}")
+    private String springIssuerUri;
 
     @Value("${app.cors.allowed-origins:http://localhost:3000,http://localhost:5173}")
     private String allowedOrigins;
@@ -84,18 +86,44 @@ public class SecurityConfig {
 
     @Bean
     public JwtDecoder jwtDecoder() {
-        log.info("🔐 JWT config | issuer: {} | jwks: {}", issuer, jwksUri);
+        String resolvedIssuer = firstNonBlank(issuer, springIssuerUri);
+        String resolvedJwksUri = firstNonBlank(jwksUri, deriveJwksUri(resolvedIssuer));
 
-        // ✅ FIX #1: Use injected credentials from environment variables
-        NimbusJwtDecoder decoder = NimbusJwtDecoder.withJwkSetUri(jwksUri)
+        log.info("JWT config | issuer: {} | jwks: {}", resolvedIssuer, resolvedJwksUri);
+
+        if (isBlank(resolvedIssuer) || isBlank(resolvedJwksUri)) {
+            throw new IllegalStateException("JWT configuration is incomplete. Set SUPABASE_ISSUER and SUPABASE_JWKS_URI, or SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI.");
+        }
+
+        NimbusJwtDecoder decoder = NimbusJwtDecoder.withJwkSetUri(resolvedJwksUri)
             .jwsAlgorithm(SignatureAlgorithm.ES256)
             .build();
 
-        // ✅ Set issuer validator to match Supabase's iss claim
-        OAuth2TokenValidator<Jwt> issuerValidator = JwtValidators.createDefaultWithIssuer(issuer);
+        OAuth2TokenValidator<Jwt> issuerValidator = JwtValidators.createDefaultWithIssuer(resolvedIssuer);
         decoder.setJwtValidator(issuerValidator);
 
         return new LoggingJwtDecoder(decoder);
+    }
+
+    private static String deriveJwksUri(String issuerUri) {
+        if (isBlank(issuerUri)) {
+            return null;
+        }
+        String normalized = issuerUri.endsWith("/") ? issuerUri.substring(0, issuerUri.length() - 1) : issuerUri;
+        return normalized + "/.well-known/jwks.json";
+    }
+
+    private static String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (!isBlank(value)) {
+                return value.trim();
+            }
+        }
+        return null;
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.trim().isEmpty();
     }
 
     private static class LoggingJwtDecoder implements JwtDecoder {

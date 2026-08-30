@@ -3,6 +3,7 @@ package com.nursery.pdf;
 import com.lowagie.text.pdf.BaseFont;
 import com.nursery.common.exception.ResourceNotFoundException;
 import com.nursery.invoice.Invoice;
+import com.nursery.invoice.AdvancePayment;
 import com.nursery.invoice.InvoiceItem;
 import com.nursery.invoice.InvoiceRepository;
 import com.nursery.profile.NurseryProfile;
@@ -15,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.xhtmlrenderer.pdf.ITextRenderer;
 
 import javax.imageio.ImageIO;
@@ -32,6 +34,7 @@ import java.io.OutputStream;
 import java.math.BigDecimal;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -176,10 +179,15 @@ public class PdfGenerationService {
     }
 
     @RateLimiter(name = "pdf-generation")
+    @Transactional(readOnly = true)
     public byte[] generateForInvoice(UUID userId, Long invoiceId) {
         Invoice invoice = invoiceRepository
                 .findByIdAndUserId(invoiceId, userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Invoice", invoiceId));
+
+        if (invoice.getAdvancePayments() != null) {
+            invoice.getAdvancePayments().size();
+        }
 
         NurseryProfile profile = profileRepository
                 .findByUserId(invoice.getUserId())
@@ -292,11 +300,14 @@ public class PdfGenerationService {
             int quantity, BigDecimal price, BigDecimal itemTotal) {
     }
 
-    /**
-     * A single label/value pair shown in the "Quotation Details" / "Invoice
-     * Details" box.
-     */
-    private record InfoRow(String label, String value) {
+    /** A single label/value pair shown in the "Quotation Details" / "Invoice Details" box. */
+    private record InfoRow(String label, String value, boolean emphasize) {
+    }
+
+    private record SummaryRow(String label, String value) {
+    }
+
+    private record AdvancePaymentRow(String date, String amount, String mode) {
     }
 
     /**
@@ -331,8 +342,13 @@ public class PdfGenerationService {
         List<LineItem> lineItems;
 
         // Totals
-        List<String> totalsSummaryLines; // extra lines shown left of the total box (quotation only)
+        List<SummaryRow> totalsSummaryRows;
+        List<InfoRow> amountRows;
         String totalAmount;
+        List<AdvancePaymentRow> advancePaymentRows;
+        String totalAdvance;
+        String remainingAmount;
+        boolean showAdvancePaymentTable;
 
         // Notes - shown for both Quotation and Invoice
         String notes;
@@ -356,21 +372,35 @@ public class PdfGenerationService {
 
         ctx.documentInfoHeading = "Quotation Details";
         ctx.documentInfoRows = List.of(
-                new InfoRow("Quote ID:", e(d(quotation.getQuotationNumber()))),
-                new InfoRow("Date:", formatDate(quotation.getCreatedAt())));
+                new InfoRow("Quote ID:", e(d(quotation.getQuotationNumber())), false),
+                new InfoRow("Date:", formatDate(quotation.getCreatedAt()), false)
+        );
 
         ctx.heightEnabled = quotation.isHeightEnabled();
         ctx.lineItems = mapQuotationItems(quotation.getItems());
 
-        List<String> quotationSummaryLines = new ArrayList<>();
-        quotationSummaryLines.add("Total Quantity: <strong>" + totalQuantity + "</strong>");
-        quotationSummaryLines.add("Total Weight: <strong>" + formatWeight(totalNetWeight) + "</strong>");
-        if (quotation.isLoadingChargesEnabled()) {
-            quotationSummaryLines
-                    .add("Loading Charges: <strong>" + formatMoney(quotation.getLoadingChargesAmount()) + "</strong>");
+        List<SummaryRow> quotationSummaryRows = new ArrayList<>();
+        quotationSummaryRows.add(new SummaryRow("Total Quantity", String.valueOf(totalQuantity)));
+        quotationSummaryRows.add(new SummaryRow("Total Weight", formatWeight(totalNetWeight)));
+        if (quotation.getDiscountAmount() != null && quotation.getDiscountAmount().signum() > 0) {
+            quotationSummaryRows.add(new SummaryRow("Discount", formatMoney(quotation.getDiscountAmount())));
         }
-        ctx.totalsSummaryLines = quotationSummaryLines;
-        ctx.totalAmount = formatMoney(quotation.getTotalAmount());
+        if (quotation.getShippingCharges() != null && quotation.getShippingCharges().signum() > 0) {
+            quotationSummaryRows.add(new SummaryRow("Loading Charges", formatMoney(quotation.getShippingCharges())));
+        }
+        ctx.totalsSummaryRows = quotationSummaryRows;
+        List<InfoRow> amountRows = new ArrayList<>();
+        amountRows.add(new InfoRow("Total Amount", formatMoney(quotation.getTotalAmount()), false));
+        if (quotation.getDiscountAmount() != null && quotation.getDiscountAmount().signum() > 0) {
+            amountRows.add(new InfoRow("Discount (-)", formatMoney(quotation.getDiscountAmount()), false));
+        }
+        if (quotation.getShippingCharges() != null && quotation.getShippingCharges().signum() > 0) {
+            amountRows.add(new InfoRow("Loading Charges (+)", formatMoney(quotation.getShippingCharges()), false));
+        }
+        amountRows.add(new InfoRow("Grand Total", formatMoney(quotation.getGrandTotal()), true));
+        ctx.amountRows = amountRows;
+        ctx.totalAmount = formatMoney(quotation.getGrandTotal());
+        ctx.showAdvancePaymentTable = false;
         ctx.notes = e(quotation.getNotes());
 
         return ctx;
@@ -397,21 +427,56 @@ public class PdfGenerationService {
 
         ctx.documentInfoHeading = "Invoice Details";
         ctx.documentInfoRows = List.of(
-                new InfoRow("Invoice:", e(invoiceNumber)),
-                new InfoRow("Date:", formatDate(effectiveDate)));
+                new InfoRow("Invoice:", e(invoiceNumber), false),
+                new InfoRow("Date:", formatDate(effectiveDate), false)
+        );
 
         ctx.heightEnabled = invoice.isHeightEnabled();
         ctx.lineItems = mapInvoiceItems(invoice.getItems());
+        List<AdvancePayment> advancePayments = invoice.getAdvancePayments() == null
+                ? List.of()
+                : invoice.getAdvancePayments();
+        BigDecimal totalAdvance = advancePayments.stream()
+                .map(AdvancePayment::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        List<String> invoiceSummaryLines = new ArrayList<>();
-        invoiceSummaryLines.add("Total Quantity: <strong>" + totalQuantity + "</strong>");
-        invoiceSummaryLines.add("Total Weight: <strong>" + formatWeight(totalNetWeight) + "</strong>");
-        if (invoice.isLoadingChargesEnabled()) {
-            invoiceSummaryLines
-                    .add("Loading Charges: <strong>" + formatMoney(invoice.getLoadingChargesAmount()) + "</strong>");
+        List<SummaryRow> invoiceSummaryRows = new ArrayList<>();
+        invoiceSummaryRows.add(new SummaryRow("Total Quantity", String.valueOf(totalQuantity)));
+        invoiceSummaryRows.add(new SummaryRow("Total Weight", formatWeight(totalNetWeight)));
+        if (invoice.getDiscountAmount() != null && invoice.getDiscountAmount().signum() > 0) {
+            invoiceSummaryRows.add(new SummaryRow("Discount", formatMoney(invoice.getDiscountAmount())));
         }
-        ctx.totalsSummaryLines = invoiceSummaryLines;
-        ctx.totalAmount = formatMoney(invoice.getTotalAmount());
+        if (invoice.getShippingCharges() != null && invoice.getShippingCharges().signum() > 0) {
+            invoiceSummaryRows.add(new SummaryRow("Loading Charges", formatMoney(invoice.getShippingCharges())));
+        }
+        ctx.totalsSummaryRows = invoiceSummaryRows;
+        List<InfoRow> amountRows = new ArrayList<>();
+        amountRows.add(new InfoRow("Total Amount", formatMoney(invoice.getTotalAmount()), false));
+        if (invoice.getDiscountAmount() != null && invoice.getDiscountAmount().signum() > 0) {
+            amountRows.add(new InfoRow("Discount (-)", formatMoney(invoice.getDiscountAmount()), false));
+        }
+        if (invoice.getShippingCharges() != null && invoice.getShippingCharges().signum() > 0) {
+            amountRows.add(new InfoRow("Loading Charges (+)", formatMoney(invoice.getShippingCharges()), false));
+        }
+        amountRows.add(new InfoRow("Grand Total", formatMoney(invoice.getGrandTotal()), true));
+        if (totalAdvance.signum() > 0) {
+            amountRows.add(new InfoRow("Total Advance", formatMoney(totalAdvance), false));
+            amountRows.add(new InfoRow("Remaining Amount", formatMoney(invoice.getGrandTotal().subtract(totalAdvance)), true));
+        }
+        ctx.amountRows = amountRows;
+        ctx.totalAmount = formatMoney(invoice.getGrandTotal());
+        ctx.showAdvancePaymentTable = invoice.isShowAdvanceListInPdf();
+        ctx.advancePaymentRows = ctx.showAdvancePaymentTable
+                ? advancePayments.stream()
+                    .map(payment -> new AdvancePaymentRow(
+                            payment.getPaymentDate() == null ? formatDate(payment.getCreatedAt()) : formatDate(payment.getPaymentDate()),
+                            formatMoney(payment.getAmount()),
+                            e(d(payment.getPaymentMode()))
+                    ))
+                    .toList()
+                : List.of();
+        ctx.totalAdvance = formatMoney(totalAdvance);
+        ctx.remainingAmount = formatMoney(invoice.getGrandTotal().subtract(totalAdvance));
         ctx.notes = e(invoice.getNotes());
 
         return ctx;
@@ -617,7 +682,7 @@ public class PdfGenerationService {
 
     private String totalBoxStyle(PdfTheme theme) {
         return "background:" + theme.totalBoxBg() + "; border:1px solid " + theme.totalBoxBorder()
-                + "; border-radius:6px; width:100%;";
+                + "; border-radius:6px; display:inline-block; min-width:200px; max-width:260px;";
     }
 
     // ------------------------------------------------------------------
@@ -823,23 +888,23 @@ public class PdfGenerationService {
     private String buildTotalsSection(DocumentContext ctx) {
         StringBuilder sb = new StringBuilder();
         sb.append("<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" ")
-                .append("style=\"margin-top:20px; margin-bottom:40px; page-break-inside:avoid;\">");
+                .append("style=\"margin-top:6px; margin-bottom:18px; page-break-inside:avoid;\">");
         sb.append("<tr>");
-        sb.append("<td width=\"70%\" valign=\"top\" style=\"padding-top:16px;\">");
-        for (String line : ctx.totalsSummaryLines) {
-            sb.append("<div class=\"totals-summary\" style=\"font-size:12px; margin-bottom:6px; ")
-                    .append(mutedStyle()).append("\">")
-                    .append(line).append("</div>");
-        }
+        sb.append("<td width=\"56%\" valign=\"top\" style=\"padding-top:8px;\">");
+        sb.append(buildLeftSummaryTable(ctx));
         sb.append("</td>");
-        sb.append("<td width=\"30%\" align=\"right\" valign=\"top\">");
+        sb.append("<td width=\"44%\" align=\"right\" valign=\"top\">");
         sb.append("<table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"").append(totalBoxStyle(ctx.theme))
                 .append("\">");
-        sb.append("<tr><td style=\"padding:16px 20px; text-align:right;\">");
-        sb.append("<div style=\"font-size:13px; font-weight:bold; color:").append(ctx.theme.primary())
-                .append("; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px;\">Total Amount</div>");
-        sb.append("<div style=\"font-size:22px; font-weight:bold; color:").append(ctx.theme.primaryDark())
-                .append(";\">").append(ctx.totalAmount).append("</div>");
+        sb.append("<tr><td style=\"padding:8px 12px;\">");
+        if (ctx.amountRows != null && !ctx.amountRows.isEmpty()) {
+            sb.append(buildAmountSummaryTable(ctx));
+        } else {
+            sb.append("<div style=\"font-size:13px; font-weight:bold; color:").append(ctx.theme.primary())
+                    .append("; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px;\">Total Amount</div>");
+            sb.append("<div style=\"font-size:22px; font-weight:bold; color:").append(ctx.theme.primaryDark())
+                    .append(";\">").append(ctx.totalAmount).append("</div>");
+        }
         sb.append("</td></tr></table>");
         sb.append("</td>");
         sb.append("</tr></table>");
@@ -856,13 +921,57 @@ public class PdfGenerationService {
 
         StringBuilder sb = new StringBuilder();
         sb.append("<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" ")
-                .append("style=\"margin-top:20px; page-break-inside:avoid;\">");
+                .append("style=\"margin-top:4px; page-break-inside:avoid;\">");
         sb.append("<tr>");
-        sb.append("<td width=\"35%\" valign=\"bottom\">").append(buildNotesSection(ctx, showNotes)).append("</td>");
-        sb.append("<td width=\"30%\"></td>");
-        sb.append("<td width=\"35%\" valign=\"bottom\" align=\"right\">").append(buildSignatureSection(ctx))
+        sb.append("<td width=\"42%\" valign=\"top\">")
+                .append(buildNotesSection(ctx, showNotes))
+                .append("</td>");
+        sb.append("<td width=\"6%\"></td>");
+        sb.append("<td width=\"52%\" valign=\"top\" align=\"right\">")
+                .append(buildAdvancePaymentsSection(ctx))
+                .append(buildSignatureSection(ctx, ctx.advancePaymentRows != null && !ctx.advancePaymentRows.isEmpty()))
                 .append("</td>");
         sb.append("</tr></table>");
+        return sb.toString();
+    }
+
+    private String buildLeftSummaryTable(DocumentContext ctx) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("<table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"border-collapse:collapse;\">");
+        if (ctx.totalsSummaryRows != null) {
+            for (SummaryRow row : ctx.totalsSummaryRows) {
+                sb.append("<tr>")
+                        .append("<td style=\"padding:0 14px 10px 0; font-size:12px; color:").append(TEXT_PRIMARY).append("; white-space:nowrap;\">")
+                        .append(row.label()).append("</td>")
+                        .append("<td style=\"padding:0 14px 10px 0; font-size:12px; color:").append(TEXT_PRIMARY).append("; white-space:nowrap;\">:</td>")
+                        .append("<td style=\"padding:0 0 10px 0; font-size:12px; font-weight:bold; color:").append(TEXT_PRIMARY).append("; text-align:left; white-space:nowrap;\">")
+                        .append(row.value()).append("</td>")
+                        .append("</tr>");
+            }
+        }
+        sb.append("</table>");
+        return sb.toString();
+    }
+
+    private String buildAmountSummaryTable(DocumentContext ctx) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("<table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"border-collapse:collapse;\">");
+        for (int i = 0; i < ctx.amountRows.size(); i++) {
+            InfoRow row = ctx.amountRows.get(i);
+            boolean separatorBefore = i > 0 && ("Grand Total".equals(row.label()) || "Total Advance".equals(row.label()) || "Remaining Amount".equals(row.label()));
+            if (separatorBefore) {
+                sb.append("<tr><td colspan=\"2\" style=\"border-top:1px solid ").append(ctx.theme.totalBoxBorder()).append("; height:6px;\"></td></tr>");
+            }
+            sb.append("<tr>")
+                    .append("<td style=\"padding:5px 16px 5px 0; font-size:12px; color:").append(TEXT_PRIMARY).append("; white-space:nowrap;")
+                    .append(row.emphasize() ? " font-weight:bold;" : "").append("\">")
+                    .append(row.label()).append("</td>")
+                    .append("<td style=\"padding:5px 0; font-size:12px; text-align:right; color:").append(TEXT_PRIMARY).append("; word-break:break-word;")
+                    .append(row.emphasize() ? " font-weight:bold;" : "").append("\">")
+                    .append(row.value()).append("</td>")
+                    .append("</tr>");
+        }
+        sb.append("</table>");
         return sb.toString();
     }
 
@@ -872,15 +981,15 @@ public class PdfGenerationService {
         }
         return "<div style=\"font-size:12px; font-weight:bold; margin-bottom:8px;\">Notes:</div>"
                 + "<div style=\"border:1px solid #dddddd; background:" + ROW_ALT_BG
-                + "; border-radius:4px; height:90px; padding:8px; white-space:pre-wrap; font-size:12px; color:"
+                + "; border-radius:4px; height:108px; padding:8px; white-space:pre-wrap; font-size:12px; color:"
                 + TEXT_PRIMARY + ";\">" + ctx.notes + "</div>";
     }
 
-    private String buildSignatureSection(DocumentContext ctx) {
+    private String buildSignatureSection(DocumentContext ctx, boolean hasAdvanceSection) {
         StringBuilder sb = new StringBuilder();
-        sb.append("<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\">");
-        sb.append("<tr><td style=\"border-bottom:2px solid ").append(TEXT_PRIMARY)
-                .append("; height:70px;\"></td></tr>");
+        sb.append("<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"margin-top:")
+                .append(hasAdvanceSection ? "10px" : "0").append("; page-break-inside:avoid;\">");
+        sb.append("<tr><td style=\"border-bottom:1px solid ").append(TEXT_PRIMARY).append("; height:34px;\"></td></tr>");
         sb.append("<tr><td style=\"text-align:right; font-size:13px; font-weight:bold; padding-top:8px;\">")
                 .append("Authorized Signature</td></tr>");
         sb.append("<tr><td style=\"text-align:right; font-size:11px; padding-top:4px; ").append(mutedStyle())
@@ -888,6 +997,43 @@ public class PdfGenerationService {
         sb.append("<tr><td style=\"text-align:right; font-size:11px; padding-top:2px; ").append(mutedStyle())
                 .append("\">Proprietor, ").append(ctx.nurseryName).append("</td></tr>");
         sb.append("</table>");
+        return sb.toString();
+    }
+
+    private String buildAdvancePaymentsSection(DocumentContext ctx) {
+        if (ctx.advancePaymentRows == null || ctx.advancePaymentRows.isEmpty()) {
+            return "";
+        }
+        String headerCell = "color:#fff; font-size:11px; font-weight:bold; text-transform:uppercase; padding:6px 8px; "
+                + "background:" + ctx.theme.primary() + "; border:1px solid " + ctx.theme.tableHeaderBorder() + ";";
+        String bodyCell = "padding:6px 8px; font-size:12px; color:" + TEXT_PRIMARY + "; border:1px solid " + BORDER_LIGHT + ";";
+        StringBuilder sb = new StringBuilder();
+        sb.append("<div style=\"border:1px solid ").append(BORDER_LIGHT).append("; border-radius:4px; overflow:hidden; ")
+                .append("margin-top:0; margin-bottom:10px; page-break-inside:avoid; width:280px; float:right;\">");
+        sb.append("<div style=\"padding:6px 10px; text-align:center; font-size:12px; font-weight:bold; color:")
+                .append(ctx.theme.primaryDark()).append("; background:").append(ctx.theme.lightBg())
+                .append("; border-bottom:1px solid ").append(BORDER_LIGHT).append(";\">ADVANCE PAYMENTS</div>");
+        sb.append("<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"border-collapse:collapse;\">");
+        sb.append("<thead><tr>");
+        sb.append("<th style=\"").append(headerCell).append(" width:100px; text-align:center;\">DATE</th>");
+        sb.append("<th style=\"").append(headerCell).append(" width:110px; text-align:right;\">AMOUNT</th>");
+        sb.append("<th style=\"").append(headerCell).append(" width:70px; text-align:center;\">MODE</th>");
+        sb.append("</tr></thead><tbody>");
+        for (AdvancePaymentRow row : ctx.advancePaymentRows) {
+            sb.append("<tr>")
+                    .append("<td style=\"").append(bodyCell).append(" text-align:center; white-space:nowrap;\">").append(row.date()).append("</td>")
+                    .append("<td style=\"").append(bodyCell).append(" text-align:right; font-weight:bold; white-space:nowrap;\">").append(row.amount()).append("</td>")
+                    .append("<td style=\"").append(bodyCell).append(" text-align:center; white-space:nowrap;\">").append(row.mode()).append("</td>")
+                    .append("</tr>");
+        }
+        sb.append("</tbody></table>");
+        sb.append("<div style=\"border-top:1px solid ").append(BORDER_LIGHT)
+                .append("; padding:6px 10px; display:flex; justify-content:space-between; align-items:center; ")
+                .append("font-size:12px; font-weight:bold; color:").append(ctx.theme.primaryDark()).append(";\">")
+                .append("<span>TOTAL ADVANCE</span>")
+                .append("<span>").append(ctx.totalAdvance).append("</span>")
+                .append("</div>");
+        sb.append("</div>");
         return sb.toString();
     }
 
@@ -1007,6 +1153,10 @@ public class PdfGenerationService {
     // ==================================================================
 
     private String formatDate(OffsetDateTime dt) {
+        return dt == null ? "-" : DATE_FORMATTER.format(dt);
+    }
+
+    private String formatDate(LocalDate dt) {
         return dt == null ? "-" : DATE_FORMATTER.format(dt);
     }
 

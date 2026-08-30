@@ -1,10 +1,12 @@
 package com.nursery.invoice.dto;
 
 import com.nursery.invoice.InvoiceStatus;
+import com.nursery.invoice.DiscountType;
 import lombok.Builder;
 import lombok.Value;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
 
@@ -19,7 +21,10 @@ public class InvoiceDtos {
         Boolean heightEnabled;
         Boolean loadingChargesEnabled;
         BigDecimal loadingPricePerTon;
+        BigDecimal shippingCharges;
+        DiscountRequest discount;
         List<InvoiceItemRequest> items;
+        Boolean showAdvanceListInPdf;
         Boolean shouldFinalize;
     }
 
@@ -32,8 +37,17 @@ public class InvoiceDtos {
         Boolean heightEnabled;
         Boolean loadingChargesEnabled;
         BigDecimal loadingPricePerTon;
+        BigDecimal shippingCharges;
+        DiscountRequest discount;
         List<InvoiceItemRequest> items;
+        Boolean showAdvanceListInPdf;
         Boolean shouldFinalize;
+    }
+
+    @Value
+    public static class DiscountRequest {
+        DiscountType type;
+        BigDecimal value;
     }
 
     @Value
@@ -74,6 +88,15 @@ public class InvoiceDtos {
         BigDecimal loadingPricePerTon;
         BigDecimal loadingChargesAmount;
         BigDecimal totalAmount;
+        DiscountType discountType;
+        BigDecimal discountPercentage;
+        BigDecimal discountAmount;
+        BigDecimal shippingCharges;
+        BigDecimal grandTotal;
+        Boolean showAdvanceListInPdf;
+        List<AdvancePaymentResponse> advancePayments;
+        BigDecimal totalAdvance;
+        BigDecimal remainingAmount;
         OffsetDateTime finalizedAt;
         OffsetDateTime createdAt;
     }
@@ -84,7 +107,27 @@ public class InvoiceDtos {
         String invoiceNumber;
         InvoiceStatus status;
         String customerName;
-        BigDecimal totalAmount;
+        BigDecimal grandTotal;
         OffsetDateTime createdAt;
+    }
+
+    @Value
+    @Builder
+    public static class AdvancePaymentRequest {
+        LocalDate paymentDate;
+        BigDecimal amount;
+        String paymentMode;
+        String remarks;
+    }
+
+    @Value
+    public static class AdvancePaymentResponse {
+        Long id;
+        LocalDate paymentDate;
+        BigDecimal amount;
+        String paymentMode;
+        String remarks;
+        OffsetDateTime createdAt;
+        OffsetDateTime updatedAt;
     }
 }
