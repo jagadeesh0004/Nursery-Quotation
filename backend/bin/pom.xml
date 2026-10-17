@@ -132,14 +132,14 @@
             <scope>provided</scope>
         </dependency>
 
-        <!-- ✅ Spring Dotenv for automatic .env loading in Spring Boot -->
+        <!-- Spring Dotenv for automatic .env loading in Spring Boot -->
         <dependency>
             <groupId>me.paulschwarz</groupId>
             <artifactId>spring-dotenv</artifactId>
             <version>2.5.4</version>
         </dependency>
 
-        <!-- ✅ FIX #6: Resilience4j for Rate Limiting -->
+        <!-- FIX #6: Resilience4j for Rate Limiting -->
         <dependency>
             <groupId>io.github.resilience4j</groupId>
             <artifactId>resilience4j-spring-boot3</artifactId>

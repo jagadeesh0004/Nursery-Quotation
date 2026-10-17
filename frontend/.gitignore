@@ -2,7 +2,7 @@ node_modules/
 dist/
 
 # ================================================================================
-# 🔐 SECURITY - ENVIRONMENT & CREDENTIALS (NEVER COMMIT)
+# SECURITY - ENVIRONMENT & CREDENTIALS (NEVER COMMIT)
 # ================================================================================
 # Environment files with secrets
 .env
@@ -17,4 +17,3 @@ dist/
 *.p12
 
 # Note: .env.example IS committed for documentation purposes
-

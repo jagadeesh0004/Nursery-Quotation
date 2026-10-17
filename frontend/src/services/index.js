@@ -12,13 +12,13 @@ export { toastService, errorMapper }
  */
 export const profileService = {
   get: () => api.get('/profile', {
-    timeout: 15000,  // ✅ Increased from 5s to 15s for Render cold starts
+    timeout: 15000,  // Increased from 5s to 15s for Render cold starts
     // Matches other API timeouts for consistency
   }),
 
     update: (data) =>
       api.put('/profile', {
-        // ✅ NOTE: userId is NOT sent - backend extracts it from auth token
+        // NOTE: userId is NOT sent - backend extracts it from auth token
         // Backend expects: nurseryName, ownerName, address, phone, email, logoPath
         nurseryName: data.nurseryName,
         ownerName: data.ownerName,
@@ -27,14 +27,14 @@ export const profileService = {
         email: data.email,
         // logoPath is optional, only include if provided
         ...(data.logoPath && { logoPath: data.logoPath }),
-      }, { timeout: 60000 }),  // ✅ 60s timeout for first save (backend initializes plants)
+      }, { timeout: 60000 }),  // 60s timeout for first save (backend initializes plants)
 
     uploadLogo: async (file, profile, userId) => {
       // Compress image
       const compressed = await compressImage(file)
 
       // Upload to Supabase Storage
-      // ✅ Use passed userId instead of profile.userId (which may be undefined)
+      // Use passed userId instead of profile.userId (which may be undefined)
       const fileName = `${userId}_${Date.now()}.webp`
       const { data, error } = await supabase.storage
         .from('logos')
@@ -46,7 +46,7 @@ export const profileService = {
 
        // Save URL to backend
        return api.put('/profile', {
-         // ✅ NOTE: userId is NOT sent - backend extracts it from auth token
+         // NOTE: userId is NOT sent - backend extracts it from auth token
          logoPath: publicUrl,
          ownerName: profile.ownerName,
          nurseryName: profile.nurseryName,

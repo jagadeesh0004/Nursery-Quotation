@@ -34,14 +34,14 @@ export const toastService = {
 
   warning: (message, options = {}) =>
     toast(message, {
-      icon: '⚠️',
+      icon: '!',
       duration: options.duration || LONG_DURATION,
       ...options,
     }),
 
   info: (message, options = {}) =>
     toast(message, {
-      icon: 'ℹ️',
+      icon: 'i',
       duration: options.duration || DEFAULT_DURATION,
       ...options,
     }),
@@ -60,4 +60,3 @@ export const toastService = {
       error: messages.error || 'Failed',
     }),
 }
-

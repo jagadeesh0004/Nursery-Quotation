@@ -42,16 +42,16 @@ export function Spinner({ size = 'md', className }) {
 
 // ── Input ────────────────────────────────────────────────────
 export const Input = forwardRef(function Input(
-  { label, error, hint, required, className, ...props }, ref
+  { id, label, error, hint, required, className, ...props }, ref
 ) {
   return (
     <div className="space-y-1.5">
       {label && (
-        <label className="block text-xs font-semibold text-muted tracking-wide">
+        <label htmlFor={id} className="block text-xs font-semibold text-muted tracking-wide">
           {label}{required && <span className="text-red-500 ml-0.5">*</span>}
         </label>
       )}
-      <input ref={ref} className={cx('field', error && 'field-error', className)} {...props} />
+      <input id={id} ref={ref} aria-invalid={Boolean(error)} className={cx('field', error && 'field-error', className)} {...props} />
       {error && <p className="text-xs text-red-500 mt-1 flex items-center gap-1"><AlertTriangle className="w-3 h-3" />{error}</p>}
       {hint && !error && <p className="text-xs text-muted mt-1">{hint}</p>}
     </div>
@@ -60,13 +60,14 @@ export const Input = forwardRef(function Input(
 
 // ── Textarea ─────────────────────────────────────────────────
 export const Textarea = forwardRef(function Textarea(
-  { label, error, className, rows = 3, ...props }, ref
+  { id, label, error, hint, required, className, rows = 3, ...props }, ref
 ) {
   return (
     <div className="space-y-1.5">
-      {label && <label className="block text-xs font-semibold text-muted tracking-wide">{label}</label>}
-      <textarea ref={ref} rows={rows} className={cx('field resize-none', error && 'field-error', className)} {...props} />
+      {label && <label htmlFor={id} className="block text-xs font-semibold text-muted tracking-wide">{label}{required && <span className="text-red-500 ml-0.5">*</span>}</label>}
+      <textarea id={id} ref={ref} rows={rows} aria-invalid={Boolean(error)} className={cx('field resize-none', error && 'field-error', className)} {...props} />
       {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
+      {hint && !error && <p className="text-xs text-muted mt-1">{hint}</p>}
     </div>
   )
 })

@@ -365,7 +365,7 @@ export default function PlantsPage() {
           </div>
 
           <InfoBox variant="green">
-            💡 Prices set here auto-fill when you create quotations. You can always edit them later.
+            Prices set here auto-fill when you create quotations. You can always edit them later.
           </InfoBox>
         </div>
       </Modal>

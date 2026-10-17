@@ -63,7 +63,7 @@ public class EmailValidatorService {
     public boolean isValidEmail(String email) {
         try {
             if (email == null || email.trim().isEmpty()) {
-                log.warn("❌ Email validation: Empty email");
+                log.warn("Email validation: Empty email");
                 return false;
             }
 
@@ -71,28 +71,28 @@ public class EmailValidatorService {
 
             // Check email format
             if (!isValidEmailFormat(email)) {
-                log.warn("❌ Email validation: Invalid email format: {}", email);
+                log.warn("Email validation: Invalid email format: {}", email);
                 return false;
             }
 
             // Extract domain
             String domain = extractDomain(email);
             if (domain == null) {
-                log.warn("❌ Email validation: Could not extract domain from: {}", email);
+                log.warn("Email validation: Could not extract domain from: {}", email);
                 return false;
             }
 
             // Check against disposable domains list
             if (DISPOSABLE_DOMAINS.contains(domain)) {
-                log.warn("⚠️ Email validation: Disposable email detected: {} (domain: {})", email, domain);
+                log.warn("Email validation: Disposable email detected: {} (domain: {})", email, domain);
                 return false;
             }
 
-            log.info("✅ Email validation: Valid email: {} (domain: {})", email, domain);
+            log.info("Email validation: Valid email: {} (domain: {})", email, domain);
             return true;
 
         } catch (Exception e) {
-            log.error("❌ Email validation error: {}", e.getMessage());
+            log.error("Email validation error: {}", e.getMessage());
             // On error, allow email (fail open)
             return true;
         }
@@ -146,7 +146,7 @@ public class EmailValidatorService {
     public void blockDomain(String domain) {
         if (domain != null && !domain.isEmpty()) {
             DISPOSABLE_DOMAINS.add(domain.toLowerCase());
-            log.info("📌 Blocked domain: {}", domain);
+            log.info("Blocked domain: {}", domain);
         }
     }
 
@@ -159,4 +159,3 @@ public class EmailValidatorService {
         return domain != null && DISPOSABLE_DOMAINS.contains(domain.toLowerCase());
     }
 }
-

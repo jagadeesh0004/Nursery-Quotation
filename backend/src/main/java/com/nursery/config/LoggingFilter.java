@@ -17,7 +17,7 @@ import java.util.Base64;
 import java.util.Map;
 
 /**
- * ✅ FIX #4: Request/Response Logging Filter
+ * FIX #4: Request/Response Logging Filter
  *
  * Logs all incoming requests and outgoing responses for:
  * - Debugging
@@ -60,7 +60,7 @@ public class LoggingFilter extends OncePerRequestFilter {
         } finally {
             long duration = Instant.now().toEpochMilli() - startTime;
             int status = response.getStatus();
-            String statusLabel = status >= 400 ? "❌" : "✅";
+            String statusLabel = status >= 400 ? "ERROR" : "OK";
 
             log.info("<<< [{}] {} | Status: {} {} | Duration: {}ms",
                 method,

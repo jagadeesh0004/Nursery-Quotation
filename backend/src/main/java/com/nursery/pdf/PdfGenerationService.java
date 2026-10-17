@@ -1,6 +1,5 @@
 package com.nursery.pdf;
 
-import com.lowagie.text.pdf.BaseFont;
 import com.nursery.common.exception.ResourceNotFoundException;
 import com.nursery.invoice.Invoice;
 import com.nursery.invoice.AdvancePayment;
@@ -12,12 +11,10 @@ import com.nursery.quotation.Quotation;
 import com.nursery.quotation.QuotationItem;
 import com.nursery.quotation.QuotationRepository;
 import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.xhtmlrenderer.pdf.ITextRenderer;
 
 import javax.imageio.ImageIO;
 import java.awt.Graphics2D;
@@ -26,11 +23,7 @@ import java.awt.geom.Ellipse2D;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.math.BigDecimal;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -52,41 +45,34 @@ import java.util.regex.Pattern;
  *
  * <p>
  * Both document types share a single HTML/CSS layout engine
- * ({@link #buildDocumentHtml}
- * and its section builders) so that header, customer block, items table,
- * totals, signature
- * and footer stay pixel-identical between the two documents. Only the color
- * {@link PdfTheme}
- * and the small set of fields called out in the spec (title, document
- * number/date, notes,
- * quotation totals vs. invoice status) differ.
+ * ({@link #buildDocumentHtml} and its section builders) so that header,
+ * customer block, items table, totals, signature and footer stay
+ * pixel-identical between the two documents. Only the color {@link PdfTheme}
+ * and the small set of fields called out in the spec differ.
  *
  * <p>
- * Retained behaviour from the previous implementation: rate limiting on all
- * public
- * generation entry points, HTTPS-only + circular-crop logo downloading with
- * caching,
- * placeholder logo fallback, and all quantity/weight/money calculations.
- *
- * <p>
- * New in this revision: proper embedded Unicode font support so Telugu text
- * (customer
- * names, addresses, notes, plant names) renders correctly alongside English
- * text, without
- * being rasterized to an image — copy/paste and text search inside the PDF keep
- * working.
+ * Retained behaviour: rate limiting on all public generation entry points,
+ * HTTPS-only + circular-crop logo downloading with caching, placeholder logo
+ * fallback, and all quantity/weight/money calculations.
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class PdfGenerationService {
 
     private final QuotationRepository quotationRepository;
     private final InvoiceRepository invoiceRepository;
     private final NurseryProfileRepository profileRepository;
-    private final ChromiumPdfService chromiumPdfService;
+    private final PdfRenderer pdfRenderer;
 
-    private static final String NOTO_TELUGU_BASE64 = FontUtil.loadFontAsBase64("fonts/NotoSansTelugu-Regular.ttf");
+    public PdfGenerationService(QuotationRepository quotationRepository,
+            InvoiceRepository invoiceRepository,
+            NurseryProfileRepository profileRepository,
+            PdfRenderer pdfRenderer) {
+        this.quotationRepository = quotationRepository;
+        this.invoiceRepository = invoiceRepository;
+        this.profileRepository = profileRepository;
+        this.pdfRenderer = pdfRenderer;
+    }
 
     // ------------------------------------------------------------------
     // Formatting constants
@@ -115,27 +101,6 @@ public class PdfGenerationService {
     private static final String ROW_ALT_BG = "#fafbfc";
     private static final String ROW_BG = "#ffffff";
     private static final String FOOTER_BORDER = "#eeeeee";
-
-    // ------------------------------------------------------------------
-    // Telugu Unicode font embedding
-    // ------------------------------------------------------------------
-
-    /**
-     * Classpath location of the embedded Unicode font. Add a Telugu-capable
-     * TrueType/OpenType
-     * font here (e.g. Noto Sans Telugu, which also covers Latin script for mixed
-     * English +
-     * Telugu text) under {@code src/main/resources/fonts/}.
-     */
-    private static final String UNICODE_FONT_RESOURCE = "/fonts/NotoSansTelugu-Regular.ttf";
-    private static final String UNICODE_FONT_FAMILY = "NotoSansTelugu";
-
-    /**
-     * Flying Saucer's font resolver needs a real file path, so the classpath font
-     * is
-     * materialized once to a temp file and reused for the life of the JVM.
-     */
-    private static volatile File cachedUnicodeFontFile;
 
     // ==================================================================
     // Public API - unchanged signatures, unchanged security/rate-limit behaviour
@@ -215,54 +180,9 @@ public class PdfGenerationService {
 
     private byte[] renderPdf(String html, String failureMessage) {
         try {
-            return chromiumPdfService.generatePdf(html);
+            return pdfRenderer.generatePdf(html);
         } catch (Exception e) {
             throw new RuntimeException(failureMessage, e);
-        }
-    }
-
-    /**
-     * Registers the embedded Unicode font with Flying Saucer's font resolver so
-     * that Telugu
-     * (and any other Unicode) glyphs are embedded directly as text - never
-     * rasterized - keeping
-     * the PDF searchable and its text selectable/copyable.
-     */
-    private void registerUnicodeFont(ITextRenderer renderer) {
-        try {
-            File fontFile = resolveUnicodeFontFile();
-            renderer.getFontResolver().addFont(
-                    fontFile.getAbsolutePath(),
-                    UNICODE_FONT_FAMILY,
-                    BaseFont.IDENTITY_H,
-                    BaseFont.EMBEDDED,
-                    null);
-        } catch (Exception ex) {
-            // Fall back silently to the renderer's default fonts. English content will
-            // still
-            // render correctly; only Telugu glyphs would be affected, so we log and
-            // continue
-            // rather than failing PDF generation.
-            log.warn("Unicode font could not be registered ({}); Telugu text may not render "
-                    + "correctly until a font is added at classpath:{}", ex.getMessage(), UNICODE_FONT_RESOURCE);
-        }
-    }
-
-    private synchronized File resolveUnicodeFontFile() throws IOException {
-        if (cachedUnicodeFontFile != null && cachedUnicodeFontFile.exists()) {
-            return cachedUnicodeFontFile;
-        }
-        try (InputStream fontStream = PdfGenerationService.class.getResourceAsStream(UNICODE_FONT_RESOURCE)) {
-            if (fontStream == null) {
-                throw new IOException("Font resource not found on classpath: " + UNICODE_FONT_RESOURCE);
-            }
-            File tempFont = File.createTempFile("nursery-unicode-font-", ".ttf");
-            tempFont.deleteOnExit();
-            try (OutputStream os = new FileOutputStream(tempFont)) {
-                fontStream.transferTo(os);
-            }
-            cachedUnicodeFontFile = tempFont;
-            return tempFont;
         }
     }
 
@@ -272,8 +192,7 @@ public class PdfGenerationService {
 
     /**
      * Color palette for one document type. Everything outside this palette (text
-     * colors,
-     * borders, row striping) is shared between Quotation and Invoice.
+     * colors, borders, row striping) is shared between Quotation and Invoice.
      */
     private record PdfTheme(String primary, String primaryDark, String tableHeaderBorder,
             String lightBg, String totalBoxBg, String totalBoxBorder) {
@@ -283,24 +202,16 @@ public class PdfGenerationService {
     private static final PdfTheme QUOTATION_THEME = new PdfTheme("#1565c0", "#0d47a1", "#42a5f5", "#f5f7fa", "#eef3fb",
             "#c7d7ef");
 
-    // Invoice palette - nursery green. Intentionally different from the Quotation
-    // blues per
-    // spec. Adjust these six values if your application already has a different
-    // invoice
-    // brand color; every invoice visual derives from this one record.
+    // Invoice palette - nursery green. Every invoice visual derives from this record.
     private static final PdfTheme INVOICE_THEME = new PdfTheme("#2e7d32", "#1b5e20", "#4caf50", "#f5f7f5", "#f1f8f1",
             "#d0e7d2");
 
-    /**
-     * One row in the items table. Both {@code QuotationItem} and
-     * {@code InvoiceItem} are
-     * mapped into this common shape so a single table builder can render either.
-     */
+    /** One row in the items table, common shape for QuotationItem and InvoiceItem. */
     private record LineItem(String plantName, String dimension, String height,
             int quantity, BigDecimal price, BigDecimal itemTotal) {
     }
 
-    /** A single label/value pair shown in the "Quotation Details" / "Invoice Details" box. */
+    /** A single label/value pair shown in the details / amount boxes. */
     private record InfoRow(String label, String value, boolean emphasize) {
     }
 
@@ -312,9 +223,7 @@ public class PdfGenerationService {
 
     /**
      * Everything the shared layout builders need. Populated once per document by
-     * {@link #buildQuotationContext} or {@link #buildInvoiceContext}; the section
-     * builders
-     * only ever read from this object, never branch on "is this a quotation".
+     * {@link #buildQuotationContext} or {@link #buildInvoiceContext}.
      */
     private static final class DocumentContext {
         PdfTheme theme;
@@ -553,30 +462,13 @@ public class PdfGenerationService {
 
     /**
      * One stylesheet structure shared by both document types; only the theme colors
-     * passed in
-     * change per render. Keeping this as a single method - rather than duplicating
-     * the CSS in
-     * two builder methods - is what keeps the Quotation and Invoice layouts
-     * identical.
+     * passed in change per render.
      */
     private String buildStyleSheet(PdfTheme theme) {
-        return "@font-face {"
-                + "font-family:'NotoSansTelugu';"
-                + "src:url(data:font/truetype;base64,"
-                + NOTO_TELUGU_BASE64
-                + ") format('truetype');"
-                + "font-weight:normal;"
-                + "font-style:normal;"
-                + "}"
-
-                // (Optional) If you add a real Bold/SemiBold font file under
-                // src/main/resources/fonts/, register it here with font-weight:700 so
-                // the renderer embeds the authentic bold glyphs. Leaving a single
-                // @font-face for the regular file keeps Telugu + Latin rendering stable.
-                + "body {"
+        return "body {"
                 + "margin:0;"
                 + "padding:0;"
-                + "font-family:'NotoSansTelugu','Helvetica Neue',Helvetica,Arial,sans-serif;"
+                + "font-family:'Noto Sans Telugu','Helvetica Neue',Helvetica,Arial,sans-serif;"
                 + "font-size:12px;"
                 + "color:" + TEXT_PRIMARY + ";"
                 + "background:#fff;"
@@ -622,19 +514,11 @@ public class PdfGenerationService {
                 + "page-break-inside:avoid;"
                 + "}"
 
-                // Values in the left-hand totals summary use a <strong> wrapper for the
-                // numeric values; make those values darker and bolder for readability.
                 + ".totals-summary strong { color: " + TEXT_BODY + "; font-weight:700; }";
     }
 
     // ------------------------------------------------------------------
     // Shared inline-style fragments
-    //
-    // These centralize repeated declarations as plain Java strings rather than CSS
-    // classes,
-    // so the borders/margins/padding stay byte-for-byte identical between Quotation
-    // and
-    // Invoice without depending on class-selector cascade behaviour.
     // ------------------------------------------------------------------
 
     private String mutedStyle() {
@@ -651,31 +535,15 @@ public class PdfGenerationService {
     }
 
     private String itemsWrapperStyle() {
-        // Only spacing now - the table itself (not this wrapper) owns the border, so
-        // there is
-        // no second border box that can misalign with the table's own collapsed cell
-        // borders.
         return "margin:20px 0 12px 0;";
     }
 
     private String tableHeaderCellStyle(PdfTheme theme) {
-        // Every header cell declares a full 1px border on all four sides. With
-        // border-collapse:collapse on the <table>, adjacent cells merge their shared
-        // edge into
-        // a single line automatically, so no per-column "none" suppression is needed -
-        // that is
-        // what previously produced gaps/uneven thickness at the header/table boundary.
         return "color:#fff; font-size:11px; font-weight:bold; text-transform:uppercase; padding:12px 8px; "
                 + "background:" + theme.primary() + "; border:1px solid " + theme.tableHeaderBorder() + ";";
     }
 
     private String tableBodyCellStyle() {
-        // Same principle as the header cells: a full, uniform border on every side of
-        // every
-        // cell. border-collapse takes care of merging identical adjacent edges into one
-        // clean
-        // line, and the outermost cells' borders become the table's visible outer
-        // frame.
         return "padding:12px 8px; font-size:12px; font-weight:600; color:" + TEXT_BODY + "; border:1px solid "
                 + BORDER_LIGHT + ";";
     }
@@ -754,16 +622,8 @@ public class PdfGenerationService {
     }
 
     private String buildCustomerSection(DocumentContext ctx) {
-        // The background/padding/border-radius now live on the containing <td> (see
-        // buildCustomerAndInfoRow) rather than on a nested <div>. Both cells sit in the
-        // same
-        // <tr>, so table row layout automatically stretches them to equal height
-        // regardless of
-        // how many rows either box has - and since the styling is on the cell itself,
-        // the
-        // colored box visibly fills that full matched height instead of only wrapping
-        // its own
-        // content height.
+        // Background/padding/border-radius live on the containing <td>, so both
+        // boxes stretch to equal height.
         StringBuilder sb = new StringBuilder();
         sb.append("<div style=\"").append(infoBoxTitleStyle(ctx.theme)).append("\">Customer Details</div>");
         sb.append("<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\">");
@@ -799,18 +659,7 @@ public class PdfGenerationService {
     private String buildItemsTable(DocumentContext ctx) {
         StringBuilder sb = new StringBuilder();
         sb.append("<div style=\"").append(itemsWrapperStyle()).append("\">");
-        // The table's own cells (not an outer border on the <table> element itself)
-        // form the
-        // visible frame. Flying Saucer's border-collapse implementation does not
-        // cleanly merge
-        // a table-level border with already-collapsed cell borders - it was adding that
-        // width
-        // on top of the collapsed cells instead of into them, inflating the table past
-        // 100%
-        // width and pushing the whole page's content past the A4 boundary. Every cell
-        // already
-        // declares a full border on all sides, so collapse alone produces a clean,
-        // flush frame.
+        // Cells own the borders; border-collapse merges them into a clean frame.
         sb.append("<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"border-collapse:collapse; ")
                 .append("page-break-inside:auto;\">");
         sb.append(buildItemsTableHeader(ctx.theme, ctx.heightEnabled));
@@ -912,8 +761,7 @@ public class PdfGenerationService {
     }
 
     // ------------------------------------------------------------------
-    // Notes + Signature (rendered as one row so the signature stays pinned to the
-    // same position whether or not the notes box is present)
+    // Notes + Signature (one row so the signature stays pinned in place)
     // ------------------------------------------------------------------
 
     private String buildNotesAndSignatureRow(DocumentContext ctx) {
@@ -977,7 +825,7 @@ public class PdfGenerationService {
 
     private String buildNotesSection(DocumentContext ctx, boolean showNotes) {
         if (!showNotes) {
-            return ""; // Invoice: column intentionally left blank to keep signature aligned right.
+            return ""; // Column intentionally left blank to keep signature aligned right.
         }
         return "<div style=\"font-size:12px; font-weight:bold; margin-bottom:8px;\">Notes:</div>"
                 + "<div style=\"border:1px solid #dddddd; background:" + ROW_ALT_BG
@@ -1051,7 +899,7 @@ public class PdfGenerationService {
     }
 
     // ==================================================================
-    // Logo handling (shared by Quotation and Invoice - previously duplicated)
+    // Logo handling (shared by Quotation and Invoice)
     // ==================================================================
 
     private String buildLogoTag(String logoPath) {
@@ -1083,9 +931,7 @@ public class PdfGenerationService {
 
     /**
      * Downloads an image from a URL and returns it as a circular-cropped PNG,
-     * base64-encoded.
-     * Results are cached for 24 hours (see the "logos" cache config) to avoid
-     * repeated downloads.
+     * base64-encoded. Results are cached for 24 hours (see the "logos" cache config).
      * SECURITY: HTTPS-only to reduce SSRF risk; callers must not pass
      * user-controlled schemes.
      */
@@ -1242,8 +1088,7 @@ public class PdfGenerationService {
             }
         }
 
-        // Fallback: extract first number and use it directly (matches frontend
-        // behaviour).
+        // Fallback: extract first number and use it directly (matches frontend behaviour).
         Matcher m = FIRST_NUMBER_PATTERN.matcher(k);
         if (m.find()) {
             try {
@@ -1268,10 +1113,7 @@ public class PdfGenerationService {
         return v.isEmpty() ? "-" : v;
     }
 
-    /**
-     * HTML-escapes a value; returns empty string for null/blank/empty-array-looking
-     * values.
-     */
+    /** HTML-escapes a value; returns empty string for null/blank/empty-array-looking values. */
     private String e(String v) {
         if (v == null || v.isBlank() || v.equals("[]")) {
             return "";

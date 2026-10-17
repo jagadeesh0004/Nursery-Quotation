@@ -46,11 +46,11 @@ try {
 
     if ($LASTEXITCODE -eq 0) {
         Write-Host ""
-        Write-Host "✓ Database cleanup completed successfully!" -ForegroundColor Green
+        Write-Host "Database cleanup completed successfully!" -ForegroundColor Green
         Write-Host "You can now restart your application."
     } else {
         Write-Host ""
-        Write-Host "✗ Error occurred during database cleanup" -ForegroundColor Red
+        Write-Host "Error occurred during database cleanup" -ForegroundColor Red
         Write-Host "Exit code: $LASTEXITCODE"
     }
 }
@@ -62,4 +62,3 @@ catch {
 finally {
     Remove-Item env:PGPASSWORD -ErrorAction SilentlyContinue
 }
-

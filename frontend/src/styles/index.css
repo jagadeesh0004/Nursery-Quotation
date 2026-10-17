@@ -62,6 +62,14 @@
   border-radius: 8px;
 }
 
+@keyframes maintenance-grow {
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes maintenance-pop {
+  to { transform: scale(1); }
+}
+
 /* ── Stagger delays ─────────────────────────────────────── */
 .stagger > *:nth-child(1) { animation-delay: .04s; }
 .stagger > *:nth-child(2) { animation-delay: .08s; }

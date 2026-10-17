@@ -1,5 +1,5 @@
 # ================================================================================
-# 🔐 SECURITY - ENVIRONMENT & CREDENTIALS (NEVER COMMIT)
+# SECURITY - ENVIRONMENT & CREDENTIALS (NEVER COMMIT)
 # ================================================================================
 # Environment files with secrets
 .env
@@ -100,4 +100,3 @@ build/
 # ================================================================================
 uploads/
 logs/
-

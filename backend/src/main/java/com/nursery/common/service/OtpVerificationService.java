@@ -38,14 +38,14 @@ public class OtpVerificationService {
      */
     public void sendOtpForSignup(UUID userId, String email) {
         try {
-            // ✅ NEW: Validate email is not temporary/disposable BEFORE sending OTP
+            // NEW: Validate email is not temporary/disposable BEFORE sending OTP
             if (!emailValidatorService.isValidEmail(email)) {
                 String message = emailValidatorService.getValidationMessage(email);
-                log.warn("❌ Email validation failed: {} - {}", email, message);
+                log.warn("Email validation failed: {} - {}", email, message);
                 throw new RuntimeException(message);
             }
 
-            log.info("✅ Email validation passed: {}", email);
+            log.info("Email validation passed: {}", email);
 
             // Delete any existing unverified OTPs for this email
             repository.deleteUnverifiedByEmail(email);
@@ -70,13 +70,13 @@ public class OtpVerificationService {
             boolean emailSent = emailService.sendOtpEmail(email, otp);
 
             if (emailSent) {
-                log.info("✅ OTP sent successfully to: {}", email);
+                log.info("OTP sent successfully to: {}", email);
             } else {
-                log.warn("⚠️ OTP generated but email send failed: {}", email);
+                log.warn("OTP generated but email send failed: {}", email);
             }
 
         } catch (Exception e) {
-            log.error("❌ Error sending OTP: {}", e.getMessage());
+            log.error("Error sending OTP: {}", e.getMessage());
             throw new RuntimeException(e.getMessage());
         }
     }
@@ -173,4 +173,3 @@ public class OtpVerificationService {
         sendOtpForSignup(userId, email);
     }
 }
-

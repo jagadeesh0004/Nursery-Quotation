@@ -112,21 +112,29 @@ export default function QuotationFormPage() {
      //const desktopCols = '3.25fr 2.25fr 1.75fr 2fr 2fr 1fr'
   function validate(shouldFinalize) {
     const errs = {}
-    if (shouldFinalize && !customerName.trim()) errs.customerName = 'Customer name is required'
-    if (shouldFinalize && !customerPhone.trim()) errs.customerPhone = 'Phone number is required to finalize'
-    if (shouldFinalize && !customerAddress.trim()) errs.customerAddress = 'Address is required to finalize'
-    if (discountType === 'PERCENTAGE' && rawDiscountValue > 100) errs.discountValue = 'Discount percentage cannot exceed 100'
-    if (discountAmount > grandTotal) errs.discountValue = 'Discount cannot exceed the plant total'
-    if (shippingValue < 0) errs.shippingCharges = 'Loading charges cannot be negative'
-    const validItems = items.filter(it => it.plantName)
-    if (validItems.length === 0) errs.items = 'Add at least one plant item to save the quotation'
+    if (shouldFinalize && !customerName.trim()) errs.customerName = 'Enter the customer name before finalizing.'
+    if (shouldFinalize && !customerPhone.trim()) errs.customerPhone = 'Enter a phone number before finalizing.'
+    else if (shouldFinalize && !/^\d{10}$/.test(customerPhone.trim())) errs.customerPhone = 'Enter a valid 10-digit phone number.'
+    if (shouldFinalize && !customerAddress.trim()) errs.customerAddress = 'Enter the delivery address before finalizing.'
+    else if (shouldFinalize && customerAddress.trim().length < 5) errs.customerAddress = 'Address must contain at least 5 characters.'
+    if (discountValue !== '' && rawDiscountValue < 0) errs.discountValue = 'Discount cannot be negative.'
+    else if (discountType === 'PERCENTAGE' && rawDiscountValue > 100) errs.discountValue = 'Discount percentage must be between 0 and 100.'
+    else if (discountAmount > grandTotal) errs.discountValue = 'Discount cannot exceed the plant total.'
+    if (shippingCharges !== '' && shippingValue < 0) errs.shippingCharges = 'Loading charges cannot be negative.'
+    const enteredItems = items.filter(it => [it.plantName, it.dimension, it.height, it.quantity, it.price].some(value => String(value ?? '').trim() !== ''))
+    const validItems = items.filter(it => it.plantName.trim())
+    if (validItems.length === 0) errs.items = 'Add at least one plant item with a name, size, quantity, and rate.'
     items.forEach((it, i) => {
-      if (it.plantName && (it.price === '' || it.price === null || it.price === undefined)) {
+      if (!enteredItems.includes(it)) return
+      const rowErrors = []
+      if (!it.plantName.trim()) rowErrors.push('Plant name is required')
+      if (!it.dimension.trim()) rowErrors.push('Bag size is required')
+      if (!Number.isInteger(Number(it.quantity)) || Number(it.quantity) <= 0) rowErrors.push('Quantity must be greater than 0')
+      if (!Number.isFinite(Number(it.price)) || Number(it.price) <= 0) rowErrors.push('Rate must be greater than 0')
+      if (heightEnabled && !it.height.trim()) rowErrors.push('Height is required when enabled')
+      if (rowErrors.length > 0) {
         if (!errs.itemRows) errs.itemRows = {}
-        errs.itemRows[i] = 'Price is required'
-      } else if (heightEnabled && it.plantName && (!it.height || !it.height.trim())) {
-        if (!errs.itemRows) errs.itemRows = {}
-        errs.itemRows[i] = 'Height is required when enabled'
+        errs.itemRows[i] = rowErrors.join('. ') + '.'
       }
     })
     setErrors(errs)
@@ -261,23 +269,23 @@ export default function QuotationFormPage() {
       </div>
 
       {/* Customer Details */}
-      <SectionCard title="Customer Details" icon="👤" className="mb-4">
+      <SectionCard title="Customer Details" icon="Customer" className="mb-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-          <Input label="Customer Name" placeholder="e.g. Ravi Traders"
+          <Input id="quotation-customer-name" label="Customer Name" required hint="Enter the name shown on the quotation." placeholder="e.g. Ravi Traders"
             value={customerName} onChange={e => setCustomerName(e.target.value)}
             error={errors.customerName} />
-          <Input label="Phone Number" type="tel" placeholder="9876543210"
-            value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} />
+          <Input id="quotation-customer-phone" label="Phone Number" required hint="Use a 10-digit mobile number." type="tel" placeholder="9876543210"
+            value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} error={errors.customerPhone} />
         </div>
-        <Textarea label="Address" placeholder="Shipping / delivery address"
+        <Textarea id="quotation-customer-address" label="Address" required hint="Include the delivery location and any useful landmarks." placeholder="Shipping / delivery address"
           value={customerAddress} onChange={e => setCustomerAddress(e.target.value)} rows={2}
           error={errors.customerAddress} />
-        <Textarea label="Notes" placeholder="Add any special instructions or remarks"
+        <Textarea id="quotation-notes" label="Notes" hint="Optional: add delivery instructions or customer remarks." placeholder="Add any special instructions or remarks"
           value={notes} onChange={e => setNotes(e.target.value)} rows={3} />
       </SectionCard>
 
       {/* Items */}
-      <SectionCard title="Items" icon="🌿" className="mb-4">
+      <SectionCard title="Items" icon="Plants" className="mb-4">
         <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-xl border border-green-100 bg-green-50/60 px-4 py-3">
           <div>
             <p className="text-sm font-semibold text-ink">Height option</p>
@@ -616,7 +624,7 @@ export default function QuotationFormPage() {
         </button>
       </SectionCard>
 
-      <SectionCard title="Amount Summary" icon="💰" className="mb-4">
+      <SectionCard title="Amount Summary" icon="Totals" className="mb-4">
         <div className="grid grid-cols-1 gap-4 mb-4">
           <Input
             label="Loading Charges"

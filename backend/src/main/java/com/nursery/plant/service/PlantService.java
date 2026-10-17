@@ -7,7 +7,6 @@ import com.nursery.common.exception.ResourceNotFoundException;
 import com.nursery.plant.*;
 import com.nursery.plant.dto.PlantDtos.*;
 import com.nursery.plant.mapper.PlantMapper;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -23,7 +22,6 @@ import java.util.UUID;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class PlantService {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
@@ -32,6 +30,16 @@ public class PlantService {
     private final DimensionRepository dimensionRepository;
     private final PlantMapper plantMapper;
     private final JdbcTemplate jdbcTemplate;
+
+    public PlantService(PlantRepository plantRepository,
+            DimensionRepository dimensionRepository,
+            PlantMapper plantMapper,
+            JdbcTemplate jdbcTemplate) {
+        this.plantRepository = plantRepository;
+        this.dimensionRepository = dimensionRepository;
+        this.plantMapper = plantMapper;
+        this.jdbcTemplate = jdbcTemplate;
+    }
 
     // ...existing code...
 
@@ -205,17 +213,17 @@ public class PlantService {
     }
 
     /**
-     * ✅ ASYNC version of initializeDefaultPlantsForUser.
+     * ASYNC version of initializeDefaultPlantsForUser.
      * Runs in background thread, doesn't block the profile save response.
      * Called from NurseryProfileService when a new profile is created.
      *
-     * ⚠️ NOTE: Includes retry logic with delay to handle race conditions
+     * NOTE: Includes retry logic with delay to handle race conditions
      * where the user might not be committed to DB yet.
      */
     @Async
     public void initializeDefaultPlantsForUserAsync(UUID userId) {
         try {
-            log.info("🌱 [ASYNC] Starting plant initialization for userId: {}", userId);
+            log.info("[ASYNC] Starting plant initialization for userId: {}", userId);
 
             // Retry logic: try up to 3 times with delays to handle FK constraint issues
             int maxRetries = 3;
@@ -225,7 +233,7 @@ public class PlantService {
             while (retryCount < maxRetries) {
                 try {
                     initializeDefaultPlantsForUser(userId);
-                    log.info("🌱 [ASYNC] Plant initialization completed for userId: {}", userId);
+                    log.info("[ASYNC] Plant initialization completed for userId: {}", userId);
                     return; // Success
                 } catch (Exception e) {
                     lastException = e;
@@ -233,7 +241,7 @@ public class PlantService {
 
                     if (retryCount < maxRetries) {
                         long delayMs = (long) Math.pow(2, retryCount - 1) * 1000; // 1s, 2s, 4s
-                        log.warn("⚠️ [ASYNC] Plant initialization failed (attempt {}/{}), retrying in {}ms. Error: {}",
+                        log.warn("[ASYNC] Plant initialization failed (attempt {}/{}), retrying in {}ms. Error: {}",
                                  retryCount, maxRetries, delayMs, e.getMessage());
                         Thread.sleep(delayMs);
                     }
@@ -241,10 +249,10 @@ public class PlantService {
             }
 
             // All retries failed
-            log.error("❌ [ASYNC] Plant initialization failed after {} attempts for userId: {}",
+            log.error("[ASYNC] Plant initialization failed after {} attempts for userId: {}",
                      maxRetries, userId, lastException);
         } catch (InterruptedException e) {
-            log.error("❌ [ASYNC] Plant initialization interrupted for userId: {}", userId, e);
+            log.error("[ASYNC] Plant initialization interrupted for userId: {}", userId, e);
             Thread.currentThread().interrupt();
         }
     }
@@ -424,7 +432,7 @@ public class PlantService {
     }
 
     /**
-     * ✅ CRITICAL FIX: Ensures user exists in the database.
+     * CRITICAL FIX: Ensures user exists in the database.
      *
      * This prevents FK constraint violations when:
      * 1. User ID comes from JWT token (Supabase)
@@ -454,10 +462,10 @@ public class PlantService {
             int inserted = jdbcTemplate.update(insertUserSql, userId.toString());
 
             if (inserted > 0) {
-                log.info("✅ Auto-created user record for userId: {}", userId);
+                log.info("Auto-created user record for userId: {}", userId);
             }
         } catch (Exception e) {
-            log.warn("⚠️ Could not ensure user exists for userId: {}. Error: {}", userId, e.getMessage());
+            log.warn("Could not ensure user exists for userId: {}. Error: {}", userId, e.getMessage());
             // Don't throw - let the plant insert happen and catch FK violation if needed
         }
     }

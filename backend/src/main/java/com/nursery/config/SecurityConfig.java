@@ -22,7 +22,7 @@ import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
 @Slf4j
 public class SecurityConfig {
 
-    // ✅ FIX #1: Load Supabase credentials from environment variables instead of hardcoding
+    // FIX #1: Load Supabase credentials from environment variables instead of hardcoding
     @Value("${supabase.jwks-uri}")
     private String jwksUri;
 
@@ -44,12 +44,12 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(request -> corsConfigSource.getCorsConfiguration(request)))
 
                 .authorizeHttpRequests(auth -> auth
-                        // ✅ Health + public endpoints (NO AUTH)
+                        // Health + public endpoints (NO AUTH)
                         // Note: context-path is /api, so these become /api/ping, /api/health, etc.
                         .requestMatchers("/ping", "/health" ,"/error").permitAll()
                         .requestMatchers("/public/**", "/sharing/**").permitAll()
                         .requestMatchers("/auth/**").permitAll()
-                        // ✅ Everything else requires auth
+                        // Everything else requires auth
                         .anyRequest().authenticated()
                 )
 
@@ -59,7 +59,7 @@ public class SecurityConfig {
                             String remoteAddr = request.getRemoteAddr();
                             String uri = request.getRequestURI();
 
-                            log.warn("🔴 AUTH FAILED | IP: {} | URI: {} | Reason: {}",
+                            log.warn("AUTH FAILED | IP: {} | URI: {} | Reason: {}",
                                     remoteAddr, uri, authException.getMessage());
 
                             response.sendError(401, "Unauthorized");
@@ -68,7 +68,7 @@ public class SecurityConfig {
 
         return http.build();
     }
-    // ✅ FIX #2: CORS configuration - restrict to known origins only
+    // FIX #2: CORS configuration - restrict to known origins only
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
@@ -138,7 +138,7 @@ public class SecurityConfig {
             try {
                 return delegate.decode(token);
             } catch (JwtException ex) {
-                log.warn("🔴 JWT decode failed: {}", ex.getMessage());
+                log.warn("JWT decode failed: {}", ex.getMessage());
                 throw ex;
             }
         }

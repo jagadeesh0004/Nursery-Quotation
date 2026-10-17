@@ -71,8 +71,8 @@ public class NurseryProfileService {
          }
 
          if (isNewProfile) {
-             log.info("📌 New user profile created, initializing default plants for userId: {}", userId);
-             // ⚠️ IMPORTANT: Async initialization needs a small delay to allow the user to be committed to DB
+             log.info("New user profile created, initializing default plants for userId: {}", userId);
+             // IMPORTANT: Async initialization needs a small delay to allow the user to be committed to DB
              // This prevents foreign key constraint violations from race conditions
              plantService.initializeDefaultPlantsForUserAsync(userId);
          }
