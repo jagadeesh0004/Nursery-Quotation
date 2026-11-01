@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, Plus, Trash2, Calculator, Save, CheckCheck, AlertTriangle, Pencil } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { invoiceService, plantService } from '../services'
+import { invoiceService, plantService, customerService } from '../services'
 import { Button, Input, Textarea, Spinner, SectionCard, Select, Modal } from '../components/ui'
 import { formatCurrency, formatNumber, formatDate, getError, cx } from '../utils'
 
@@ -12,6 +12,7 @@ export default function InvoiceFormPage() {
   const { id } = useParams()
   const isEdit = Boolean(id)
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
 
   const [plants, setPlants] = useState([])
   const [customerName, setCustomerName] = useState('')
@@ -36,6 +37,16 @@ export default function InvoiceFormPage() {
   const [deletingAdvanceId, setDeletingAdvanceId] = useState(null)
   const [editingAdvance, setEditingAdvance] = useState(null)
   const [advanceForm, setAdvanceForm] = useState({ paymentDate: '', amount: '', paymentMode: 'Cash', remarks: '' })
+
+  useEffect(() => {
+    const customerId = searchParams.get('customerId')
+    if (!isEdit && customerId) customerService.getOne(customerId).then(r => {
+      const c = r.data.data
+      setCustomerName(c.name || '')
+      setCustomerPhone(c.phone || '')
+      setCustomerAddress(c.address || '')
+    }).catch(err => { const message = getError(err); if (message) toast.error(message) })
+  }, [isEdit, searchParams])
 
   useEffect(() => {
     plantService.list()
@@ -118,8 +129,6 @@ export default function InvoiceFormPage() {
   function validate(shouldFinalize) {
     const errs = {}
     if (shouldFinalize && !customerName.trim()) errs.customerName = 'Enter the customer name before finalizing.'
-    if (shouldFinalize && !customerPhone.trim()) errs.customerPhone = 'Enter a phone number before finalizing.'
-    else if (shouldFinalize && !/^\d{10}$/.test(customerPhone.trim())) errs.customerPhone = 'Enter a valid 10-digit phone number.'
     if (shouldFinalize && !customerAddress.trim()) errs.customerAddress = 'Enter the delivery address before finalizing.'
     else if (shouldFinalize && customerAddress.trim().length < 5) errs.customerAddress = 'Address must contain at least 5 characters.'
     if (discountValue !== '' && rawDiscountValue < 0) errs.discountValue = 'Discount cannot be negative.'

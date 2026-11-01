@@ -8,6 +8,8 @@ import AppLayout               from './components/layout/AppLayout'
 import LoginPage               from './pages/LoginPage'
 import AuthCallbackPage        from './pages/AuthCallbackPage'
 import DashboardPage           from './pages/DashboardPage'
+import QuotationsPage          from './pages/QuotationsPage'
+import CustomerDetailPage      from './pages/CustomerDetailPage'
 import PlantsPage              from './pages/PlantsPage'
 import QuotationFormPage       from './pages/QuotationFormPage'
 import QuotationDetailPage     from './pages/QuotationDetailPage'
@@ -104,8 +106,11 @@ function AppRoutes() {
           <Route element={<ProtectedRoute />}>
             <Route element={<AppLayout />}>
               <Route path="/dashboard"            element={<DashboardPage />} />
+              <Route path="/customers"            element={<DashboardPage />} />
+              <Route path="/customers/:id"        element={<CustomerDetailPage />} />
               <Route path="/plants"               element={<PlantsPage />} />
               <Route path="/quotations/new"       element={<QuotationFormPage />} />
+              <Route path="/quotations"           element={<QuotationsPage />} />
               <Route path="/quotations/:id/edit"  element={<QuotationFormPage />} />
               <Route path="/quotations/:id"       element={<QuotationDetailPage />} />
               <Route path="/invoices"             element={<InvoiceListPage />} />

@@ -97,6 +97,12 @@ export const quotationService = {
     }),
 }
 
+export const customerService = {
+  list: (search) => api.get('/customers', { params: search ? { search } : {} }),
+  getOne: (id) => api.get(`/customers/${id}`),
+  update: (id, data) => api.put(`/customers/${id}`, data),
+}
+
 /**
  * invoiceService — Handle /invoices endpoints
  */

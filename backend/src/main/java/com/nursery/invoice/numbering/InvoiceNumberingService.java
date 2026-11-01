@@ -2,8 +2,8 @@ package com.nursery.invoice.numbering;
 
 import com.nursery.common.exception.BusinessException;
 import com.nursery.invoice.InvoiceRepository;
-import com.nursery.pdf.profile.NurseryProfile;
-import com.nursery.pdf.profile.NurseryProfileRepository;
+import com.nursery.profile.NurseryProfile;
+import com.nursery.profile.NurseryProfileRepository;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

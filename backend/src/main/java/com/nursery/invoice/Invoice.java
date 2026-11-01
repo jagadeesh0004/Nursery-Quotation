@@ -1,5 +1,6 @@
 package com.nursery.invoice;
 
+import com.nursery.customer.Customer;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -23,6 +24,10 @@ public class Invoice {
     private Long id;
 
     private UUID userId;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "customer_id")
+    private Customer customer;
 
     @Enumerated(EnumType.STRING)
     private InvoiceStatus status;

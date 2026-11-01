@@ -445,7 +445,15 @@ public class PlantService {
      */
     private void ensureUserExists(UUID userId) {
         try {
-            String checkUserSql = "SELECT 1 FROM users WHERE id = ?::uuid LIMIT 1";
+            Boolean usersTableExists = jdbcTemplate.queryForObject(
+                    "SELECT EXISTS (SELECT 1 FROM information_schema.tables " +
+                    "WHERE table_schema = 'public' AND table_name = 'users')",
+                    Boolean.class);
+            if (!Boolean.TRUE.equals(usersTableExists)) {
+                return;
+            }
+
+            String checkUserSql = "SELECT 1 FROM public.users WHERE id = ?::uuid LIMIT 1";
             Integer exists = jdbcTemplate.queryForObject(checkUserSql, Integer.class, userId.toString());
 
             if (exists != null) {
@@ -456,7 +464,7 @@ public class PlantService {
         }
 
         try {
-            String insertUserSql = "INSERT INTO users (id, auth_method, created_at, updated_at) " +
+            String insertUserSql = "INSERT INTO public.users (id, auth_method, created_at, updated_at) " +
                                   "VALUES (?::uuid, 'GOOGLE', NOW(), NOW()) " +
                                   "ON CONFLICT (id) DO NOTHING";
             int inserted = jdbcTemplate.update(insertUserSql, userId.toString());

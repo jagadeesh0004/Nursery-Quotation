@@ -5,8 +5,8 @@ import com.nursery.invoice.Invoice;
 import com.nursery.invoice.AdvancePayment;
 import com.nursery.invoice.InvoiceItem;
 import com.nursery.invoice.InvoiceRepository;
-import com.nursery.pdf.profile.NurseryProfile;
-import com.nursery.pdf.profile.NurseryProfileRepository;
+import com.nursery.profile.NurseryProfile;
+import com.nursery.profile.NurseryProfileRepository;
 import com.nursery.quotation.Quotation;
 import com.nursery.quotation.QuotationItem;
 import com.nursery.quotation.QuotationRepository;
@@ -327,9 +327,12 @@ public class PdfGenerationService {
         ctx.customerPhone = e(d(invoice.getCustomerPhone()));
         ctx.customerAddress = e(d(invoice.getCustomerAddress()));
 
-        String invoiceNumber = invoice.getInvoiceNumber() != null && !invoice.getInvoiceNumber().isBlank()
-                ? invoice.getInvoiceNumber()
-                : "-";
+        String initials = profile != null && profile.getInitials() != null && !profile.getInitials().isBlank()
+                ? profile.getInitials().toUpperCase(Locale.US)
+                : "INV";
+        String invoiceNumber = invoice.getSequence() == null
+                ? "INV-" + invoice.getId()
+                : String.format(Locale.US, "INV-%s%04d", initials, invoice.getSequence());
         OffsetDateTime effectiveDate = invoice.getInvoiceDate() != null
                 ? invoice.getInvoiceDate()
                 : (invoice.getFinalizedAt() != null ? invoice.getFinalizedAt() : invoice.getCreatedAt());
@@ -628,7 +631,9 @@ public class PdfGenerationService {
         sb.append("<div style=\"").append(infoBoxTitleStyle(ctx.theme)).append("\">Customer Details</div>");
         sb.append("<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\">");
         sb.append(infoBoxRow("Name:", ctx.customerName, "70px"));
-        sb.append(infoBoxRow("Phone:", ctx.customerPhone, null));
+        if (ctx.customerPhone != null && !ctx.customerPhone.isBlank()) {
+            sb.append(infoBoxRow("Phone:", ctx.customerPhone, null));
+        }
         sb.append(infoBoxRow("Address:", ctx.customerAddress, null));
         sb.append("</table>");
         return sb.toString();

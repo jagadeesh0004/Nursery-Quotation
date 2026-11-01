@@ -2,10 +2,11 @@ package com.nursery.quotation.service;
 
 import com.nursery.common.exception.BusinessException;
 import com.nursery.common.exception.ResourceNotFoundException;
+import com.nursery.customer.CustomerService;
 import com.nursery.common.response.PageResponse;
 import com.nursery.invoice.DiscountType;
-import com.nursery.pdf.profile.NurseryProfile;
-import com.nursery.pdf.profile.NurseryProfileRepository;
+import com.nursery.profile.NurseryProfile;
+import com.nursery.profile.NurseryProfileRepository;
 import com.nursery.plant.service.PlantService;
 import com.nursery.quotation.Quotation;
 import com.nursery.quotation.QuotationItem;
@@ -49,6 +50,7 @@ public class QuotationService {
     private final QuotationNumberingService numberingService;
     private final CalculationEngine calculationEngine;
     private final PlantService plantService;
+    private final CustomerService customerService;
 
     private final SecureRandom secureRandom = new SecureRandom();
 
@@ -63,14 +65,15 @@ public class QuotationService {
         Quotation quotation = Quotation.builder()
                 .userId(userId)
                 .status(finalize ? QuotationStatus.FINAL : QuotationStatus.DRAFT)
-                .customerName(request.customerName())
-                .customerPhone(request.customerPhone())
-                .customerAddress(request.customerAddress())
+                .customerName(normalize(request.customerName()))
+                .customerPhone(CustomerService.normalize(request.customerPhone()))
+                .customerAddress(CustomerService.normalize(request.customerAddress()))
                 .notes(request.notes())
                 .heightEnabled(Boolean.TRUE.equals(request.heightEnabled()))
                 .shippingCharges(zeroIfNull(request.shippingCharges()))
                 .year(Year.now().getValue())
                 .build();
+        quotation.setCustomer(customerService.findOrCreate(userId, request.customerName(), request.customerPhone(), request.customerAddress()));
 
         applyItems(quotation, request.items(), userId);
         applyDiscount(quotation, request.discount());
@@ -119,9 +122,10 @@ public class QuotationService {
             validateFinalQuotationRequest(request.customerName(), request.customerPhone(), request.customerAddress(), request.items());
         }
 
-        quotation.setCustomerName(request.customerName());
-        quotation.setCustomerPhone(request.customerPhone());
-        quotation.setCustomerAddress(request.customerAddress());
+        quotation.setCustomerName(normalize(request.customerName()));
+        quotation.setCustomerPhone(CustomerService.normalize(request.customerPhone()));
+        quotation.setCustomerAddress(CustomerService.normalize(request.customerAddress()));
+        quotation.setCustomer(customerService.findOrCreate(userId, request.customerName(), request.customerPhone(), request.customerAddress()));
         quotation.setNotes(request.notes());
         quotation.setHeightEnabled(Boolean.TRUE.equals(request.heightEnabled()));
         quotation.setShippingCharges(zeroIfNull(request.shippingCharges()));
@@ -156,7 +160,7 @@ public class QuotationService {
         }
 
         if (request.customerName() != null) quotation.setCustomerName(request.customerName());
-        if (request.customerPhone() != null) quotation.setCustomerPhone(request.customerPhone());
+        if (request.customerPhone() != null)   quotation.setCustomerPhone(CustomerService.normalize(request.customerPhone()));
         if (request.customerAddress() != null) quotation.setCustomerAddress(request.customerAddress());
         if (request.notes() != null) quotation.setNotes(request.notes());
         if (request.heightEnabled() != null) quotation.setHeightEnabled(request.heightEnabled());
@@ -216,6 +220,7 @@ public class QuotationService {
                 .toList();
 
         copy.getItems().addAll(copiedItems);
+        copy.setCustomer(source.getCustomer());
         calculationEngine.recalculate(copy);
 
         Quotation saved = quotationRepository.save(copy);
@@ -279,13 +284,19 @@ public class QuotationService {
     private void validateFinalQuotationRequest(String customerName, String customerPhone, String customerAddress, List<QuotationItemRequest> items) {
         List<String> errors = new ArrayList<>();
         if (customerName == null || customerName.isBlank()) errors.add("Customer name is required for a final quotation.");
-        if (customerPhone == null || customerPhone.isBlank()) errors.add("Customer phone is required for a final quotation.");
-        if (customerAddress == null || customerAddress.isBlank()) errors.add("Customer address is required for a final quotation.");
-        if (items == null || items.isEmpty()) errors.add("At least one item is required for a final quotation.");
+        if (customerAddress == null || customerAddress.isBlank())
+            errors.add("Customer address is required for a final quotation.");
+        if (items == null || items.isEmpty())
+            errors.add("At least one item is required for a final quotation.");
 
         if (!errors.isEmpty()) {
             throw new BusinessException(String.join(" ", errors));
         }
+
+    }
+
+    private String normalize(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 
     private void applyDiscount(Quotation quotation, DiscountRequest discount) {

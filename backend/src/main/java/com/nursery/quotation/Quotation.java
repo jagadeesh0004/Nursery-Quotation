@@ -2,6 +2,7 @@ package com.nursery.quotation;
 
 import com.nursery.common.entity.BaseAuditEntity;
 import com.nursery.invoice.DiscountType;
+import com.nursery.customer.Customer;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.SQLRestriction;
@@ -28,6 +29,10 @@ public class Quotation extends BaseAuditEntity {
 
     @Column(name = "user_id", nullable = false)
     private UUID userId;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "customer_id")
+    private Customer customer;
 
     @Column(name = "quotation_number", length = 50)
     private String quotationNumber;

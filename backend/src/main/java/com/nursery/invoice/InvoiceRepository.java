@@ -35,4 +35,10 @@ public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
 
     @Query("SELECT COALESCE(MAX(i.sequence), 0) FROM Invoice i WHERE i.userId = :userId AND i.year = :year")
     int findMaxSequenceForUserAndYear(@Param("userId") UUID userId, @Param("year") int year);
+
+    @Query("SELECT COUNT(i) FROM Invoice i WHERE i.customer.id = :customerId AND i.userId = :userId AND i.deletedAt IS NULL")
+    long countByCustomerIdAndUserId(@Param("customerId") Long customerId, @Param("userId") UUID userId);
+
+    @Query("SELECT i FROM Invoice i WHERE i.customer.id = :customerId AND i.userId = :userId AND i.deletedAt IS NULL ORDER BY i.createdAt DESC")
+    List<Invoice> findByCustomerIdAndUserId(@Param("customerId") Long customerId, @Param("userId") UUID userId);
 }
