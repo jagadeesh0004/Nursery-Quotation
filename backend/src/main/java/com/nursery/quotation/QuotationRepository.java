@@ -4,6 +4,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
@@ -45,6 +46,12 @@ public interface QuotationRepository extends JpaRepository<Quotation, Long> {
     // ─── Analytics ───────────────────────────────────────────────────
 
     long countByUserId(UUID userId);
+
+    @Query("SELECT COUNT(q) FROM Quotation q WHERE q.customer.id = :customerId AND q.userId = :userId")
+    long countByCustomerIdAndUserId(@Param("customerId") Long customerId, @Param("userId") UUID userId);
+
+    @Query("SELECT q FROM Quotation q WHERE q.customer.id = :customerId AND q.userId = :userId ORDER BY q.createdAt DESC")
+    List<Quotation> findByCustomerIdAndUserId(Long customerId, UUID userId);
 
     @Query("SELECT COALESCE(SUM(q.totalAmount), 0) FROM Quotation q WHERE q.userId = :userId AND q.status = 'FINAL'")
     BigDecimal sumTotalAmountByUserIdAndStatusFinal(UUID userId);

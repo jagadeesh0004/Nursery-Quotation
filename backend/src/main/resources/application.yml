@@ -45,6 +45,7 @@ spring:
     validate-on-migrate: false
     locations: classpath:db/migration
     encoding: UTF-8
+    schemas: public
 
   servlet:
     multipart:

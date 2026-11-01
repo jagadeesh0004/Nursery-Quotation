@@ -2,6 +2,7 @@ package com.nursery.invoice.service;
 
 import com.nursery.common.exception.BusinessException;
 import com.nursery.common.exception.ResourceNotFoundException;
+import com.nursery.customer.CustomerService;
 import com.nursery.invoice.DiscountType;
 import com.nursery.invoice.Invoice;
 import com.nursery.invoice.InvoiceItem;
@@ -41,6 +42,7 @@ public class InvoiceService {
     private final NurseryProfileRepository profileRepository;
     private final InvoiceNumberingService numberingService;
     private final AdvancePaymentService advancePaymentService;
+    private final CustomerService customerService;
 
     @Transactional
     public InvoiceResponse createInvoice(UUID userId, CreateInvoiceRequest request) {
@@ -57,9 +59,9 @@ public class InvoiceService {
         Invoice invoice = Invoice.builder()
                 .userId(userId)
                 .status(finalize ? com.nursery.invoice.InvoiceStatus.FINAL : com.nursery.invoice.InvoiceStatus.DRAFT)
-                .customerName(request.getCustomerName())
-                .customerPhone(request.getCustomerPhone())
-                .customerAddress(request.getCustomerAddress())
+                .customerName(CustomerService.normalize(request.getCustomerName()))
+                .customerPhone(CustomerService.normalize(request.getCustomerPhone()))
+                .customerAddress(CustomerService.normalize(request.getCustomerAddress()))
                 .notes(request.getNotes())
                 .heightEnabled(Boolean.TRUE.equals(request.getHeightEnabled()))
                 .shippingCharges(zeroIfNull(request.getShippingCharges()))
@@ -67,6 +69,7 @@ public class InvoiceService {
                 .year(Year.now().getValue())
                 .invoiceDate(OffsetDateTime.now())
                 .build();
+        invoice.setCustomer(customerService.findOrCreate(userId, request.getCustomerName(), request.getCustomerPhone(), request.getCustomerAddress()));
 
         applyItems(invoice, request.getItems());
         applyDiscount(invoice, request.getDiscount());
@@ -117,9 +120,10 @@ public class InvoiceService {
                     request.getItems());
         }
 
-        invoice.setCustomerName(request.getCustomerName());
-        invoice.setCustomerPhone(request.getCustomerPhone());
-        invoice.setCustomerAddress(request.getCustomerAddress());
+        invoice.setCustomerName(CustomerService.normalize(request.getCustomerName()));
+        invoice.setCustomerPhone(CustomerService.normalize(request.getCustomerPhone()));
+        invoice.setCustomerAddress(CustomerService.normalize(request.getCustomerAddress()));
+        invoice.setCustomer(customerService.findOrCreate(userId, request.getCustomerName(), request.getCustomerPhone(), request.getCustomerAddress()));
         invoice.setNotes(request.getNotes());
         invoice.setHeightEnabled(Boolean.TRUE.equals(request.getHeightEnabled()));
         invoice.setShippingCharges(zeroIfNull(request.getShippingCharges()));
@@ -170,6 +174,7 @@ public class InvoiceService {
                 .totalAmount(source.getTotalAmount())
                 .invoiceDate(OffsetDateTime.now())
                 .build();
+        invoice.setCustomer(source.getCustomer());
 
         List<InvoiceItem> copied = source.getItems().stream().map(item -> InvoiceItem.builder()
                 .invoice(invoice)
@@ -305,8 +310,6 @@ public class InvoiceService {
         List<String> errors = new ArrayList<>();
         if (customerName == null || customerName.isBlank())
             errors.add("Customer name is required for a final invoice.");
-        if (customerPhone == null || customerPhone.isBlank())
-            errors.add("Customer phone is required for a final invoice.");
         if (customerAddress == null || customerAddress.isBlank())
             errors.add("Customer address is required for a final invoice.");
         if (items == null || items.isEmpty())
@@ -361,7 +364,7 @@ public class InvoiceService {
 
     private String formatInvoiceNumber(NurseryProfile profile, Invoice invoice) {
         if (invoice.getSequence() == null || invoice.getYear() == null) {
-            return "-";
+            return "INV-" + invoice.getId();
         }
 
         String initials = profile != null && profile.getInitials() != null && !profile.getInitials().isBlank()
