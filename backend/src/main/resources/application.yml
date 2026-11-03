@@ -15,11 +15,11 @@ spring:
     password: ${SPRING_DATASOURCE_PASSWORD}
     driver-class-name: org.postgresql.Driver
     hikari:
-      maximum-pool-size: 5
-      minimum-idle: 5
+      maximum-pool-size: ${DB_POOL_MAX_SIZE:3}
+      minimum-idle: ${DB_POOL_MIN_IDLE:1}
       idle-timeout: 30000
       max-lifetime: 1800000
-      connection-timeout: 30000
+      connection-timeout: 10000
       initialization-fail-timeout: 60000
       data-source-properties:
         prepareThreshold: 0
@@ -61,7 +61,7 @@ spring:
   cache:
     type: caffeine
     caffeine:
-      spec: maximumSize=1000,expireAfterWrite=24h
+      spec: maximumSize=${APP_CACHE_MAX_SIZE:200},expireAfterWrite=${APP_CACHE_TTL:1h}
 
 supabase:
   jwks-uri: ${SUPABASE_JWKS_URI}
@@ -94,14 +94,14 @@ resilience4j:
 
 logging:
   level:
-    root: INFO
+    root: ${LOG_LEVEL_ROOT:WARN}
     com.nursery: INFO
     org.hibernate.SQL: OFF
     org.hibernate.type.descriptor.sql: OFF
-    org.flywaydb: INFO
-    org.springframework: INFO
-    org.springframework.security: INFO
-    org.springframework.security.oauth2: INFO
+    org.flywaydb: WARN
+    org.springframework: WARN
+    org.springframework.security: WARN
+    org.springframework.security.oauth2: WARN
   file:
     name: logs/app.log
 
