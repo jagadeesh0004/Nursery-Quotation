@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /
+Disallow: /dashboard
+Disallow: /customers
+Disallow: /plants
+Disallow: /quotations
+Disallow: /invoices
+Disallow: /settings
+Disallow: /auth/
+
+Sitemap: https://nursery-quotation.vercel.app/sitemap.xml
